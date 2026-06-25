@@ -4,8 +4,8 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     # Gemini
     GEMINI_API_KEY: str
-    GEMINI_FLASH_MODEL: str = "gemini-2.5-flash-lite"
-    GEMINI_PRO_MODEL: str = "gemini-2.5-flash"
+    GEMINI_FLASH_MODEL_LOW: str = "gemini-2.5-flash"
+    GEMINI_FLASH_MODEL_HIGH: str = "gemini-2.5-flash"
 
     # Supabase Edge Function
     SUPABASE_URL: str
@@ -18,9 +18,10 @@ class Settings(BaseSettings):
     # Defaults
     DEFAULT_TABLE_NAME: str = "kb_demo"
     DEFAULT_MATCH_COUNT: int = 5
-    #API
+
+    # API
     AGENT_API_KEY: str
-    
+
     class Config:
         env_file = ".env"
 

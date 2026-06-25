@@ -10,7 +10,7 @@ class ResearchAgent:
     def __init__(self):
         genai.configure(api_key=settings.GEMINI_API_KEY)
         self.model = genai.GenerativeModel(
-            model_name=settings.GEMINI_FLASH_MODEL,
+            model_name=settings.GEMINI_FLASH_MODEL_HIGH,
             generation_config={"temperature": 0.3, "max_output_tokens": 1300},
         )
 
