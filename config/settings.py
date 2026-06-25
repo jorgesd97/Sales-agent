@@ -18,7 +18,9 @@ class Settings(BaseSettings):
     # Defaults
     DEFAULT_TABLE_NAME: str = "kb_demo"
     DEFAULT_MATCH_COUNT: int = 5
-
+    #API
+    AGENT_API_KEY: str
+    
     class Config:
         env_file = ".env"
 
