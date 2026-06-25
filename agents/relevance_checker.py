@@ -12,11 +12,7 @@ class RelevanceChecker:
         genai.configure(api_key=settings.GEMINI_API_KEY)
         self.model = genai.GenerativeModel(
             model_name=settings.GEMINI_FLASH_MODEL_LOW,
-            generation_config={
-                                        "temperature": 0, 
-                                        "max_output_tokens": 150,
-                                        "thinking": {"thinking_budget": 0},
-                                    },
+            generation_config={"temperature": 0, "max_output_tokens": 100}
             safety_settings={
                 HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
                 HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
@@ -51,10 +47,15 @@ You are an AI relevance checker between a user's question and provided document 
             classification = response.text.strip().upper()
             logger.info(f"Relevance check: '{question}' -> {classification}")
 
+            # Donde validas la clasificación, cambia:
             valid_labels = {"CAN_ANSWER", "PARTIAL", "NO_MATCH"}
             if classification not in valid_labels:
+                # Manejar respuestas truncadas
+                if classification.startswith("CAN"):
+                    return "CAN_ANSWER"
+                if classification.startswith("PAR"):
+                    return "PARTIAL"
                 return "NO_MATCH"
-
             return classification
 
         except Exception as e:

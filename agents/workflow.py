@@ -76,13 +76,11 @@ class AgentWorkflow:
             context=state["context"],
         )
 
-        if classification in ("CAN_ANSWER", "PARTIAL"):
+        if classification.startswith("CAN") or classification == "PARTIAL":
             return {"is_relevant": True}
 
-        return {
-            "is_relevant": True,
-            "context": "",  # Sin contexto, el agente responde con el prompt
-        }
+        # NO_MATCH pero no borramos el contexto
+        return {"is_relevant": True}
 
     def _decide_after_relevance(self, state: AgentState) -> str:
         return "relevant" if state["is_relevant"] else "irrelevant"
