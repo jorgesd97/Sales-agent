@@ -64,6 +64,9 @@ class AgentWorkflow:
         )
         context = self.retriever.format_context(documents)
         logger.info(f"Retrieved {len(documents)} chunks")
+        # Ver qué chunks trajo
+        for i, doc in enumerate(documents):
+            logger.info(f"Chunk {i}: {doc['content'][:100]}...")
         return {"context": context}
 
     async def _check_relevance_step(self, state: AgentState) -> dict:
@@ -84,12 +87,16 @@ class AgentWorkflow:
         return "relevant" if state["is_relevant"] else "irrelevant"
 
     async def _research_step(self, state: AgentState) -> dict:
+        logger.info(f"Context length: {len(state['context'])} chars")
+        logger.info(f"Context preview: {state['context'][:200]}...")
+        
         answer = await self.researcher.generate(
             question=state["question"],
             context=state["context"],
             system_prompt=state.get("system_prompt", ""),
             chat_history=state.get("chat_history", ""),
         )
+        logger.info(f"Draft answer: {answer[:150]}...")
         return {"draft_answer": answer}
 
     async def _verify_step(self, state: AgentState) -> dict:
