@@ -64,6 +64,7 @@ class AgentWorkflow:
         )
         context = self.retriever.format_context(documents)
         logger.info(f"Retrieved {len(documents)} chunks")
+        logger.info(f"Context generated: {len(context)} chars")  # ← agregar esto
         # Ver qué chunks trajo
         for i, doc in enumerate(documents):
             logger.info(f"Chunk {i}: {doc['content'][:100]}...")
