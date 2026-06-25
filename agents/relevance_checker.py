@@ -2,6 +2,7 @@ import google.generativeai as genai
 import logging
 
 from config.settings import settings
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +13,12 @@ class RelevanceChecker:
         self.model = genai.GenerativeModel(
             model_name=settings.GEMINI_FLASH_MODEL_LOW,
             generation_config={"temperature": 0, "max_output_tokens": 10},
+            safety_settings={
+                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+            },
         )
 
     async def check(self, question: str, context: str) -> str:
