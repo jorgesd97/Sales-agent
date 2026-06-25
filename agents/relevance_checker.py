@@ -12,7 +12,7 @@ class RelevanceChecker:
         genai.configure(api_key=settings.GEMINI_API_KEY)
         self.model = genai.GenerativeModel(
             model_name=settings.GEMINI_FLASH_MODEL_LOW,
-            generation_config={"temperature": 0, "max_output_tokens": 10},
+            generation_config={"temperature": 0, "max_output_tokens": 50},
             safety_settings={
                 HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
                 HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
