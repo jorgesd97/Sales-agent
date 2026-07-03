@@ -11,7 +11,7 @@ from config.settings import settings
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Sales Agent API")
+app = FastAPI(title="Sales Agent API", docs_url=None, redoc_url=None, openapi_url=None)
 workflow = AgentWorkflow()
 memory = PostgresMemory()
 
