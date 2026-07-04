@@ -13,6 +13,7 @@ class RelevanceChecker:
         self.config = types.GenerateContentConfig(
             temperature=0,
             max_output_tokens=100,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
             safety_settings=[
                 types.SafetySetting(
                     category="HARM_CATEGORY_HARASSMENT",
