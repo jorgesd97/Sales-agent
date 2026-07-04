@@ -12,7 +12,8 @@ class ResearchAgent:
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
         self.config = types.GenerateContentConfig(
             temperature=0.3,
-            max_output_tokens=1300,
+            max_output_tokens=2000,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
             safety_settings=[
                 types.SafetySetting(
                     category="HARM_CATEGORY_HARASSMENT",
