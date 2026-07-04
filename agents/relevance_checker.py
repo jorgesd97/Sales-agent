@@ -1,4 +1,5 @@
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import logging
 
 from config.settings import settings
@@ -9,16 +10,28 @@ logger = logging.getLogger(__name__)
 
 class RelevanceChecker:
     def __init__(self):
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel(
-            model_name=settings.GEMINI_FLASH_MODEL_LOW,
-            generation_config={"temperature": 0, "max_output_tokens": 100},
-            safety_settings={
-                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-            },
+        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        self.config = types.GenerateContentConfig(
+            temperature=0,
+            max_output_tokens=100,
+            safety_settings=[
+                types.SafetySetting(
+                    category="HARM_CATEGORY_HARASSMENT",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_HATE_SPEECH",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_DANGEROUS_CONTENT",
+                    threshold="BLOCK_NONE",
+                ),
+            ]
         )
 
     async def check(self, question: str, context: str) -> str:
@@ -43,14 +56,18 @@ You are an AI relevance checker between a user's question and provided document 
 """
 
         try:
-            response = self.model.generate_content(prompt)
+            # 3. Llamamos al método a través del cliente unificado
+            response = self.client.models.generate_content(
+                model=settings.GEMINI_FLASH_MODEL_LOW,
+                contents=prompt,
+                config=self.config
+            )
+            
             classification = response.text.strip().upper()
             logger.info(f"Relevance check: '{question}' -> {classification}")
 
-            # Donde validas la clasificación, cambia:
             valid_labels = {"CAN_ANSWER", "PARTIAL", "NO_MATCH"}
             if classification not in valid_labels:
-                # Manejar respuestas truncadas
                 if classification.startswith("CAN"):
                     return "CAN_ANSWER"
                 if classification.startswith("PAR"):
