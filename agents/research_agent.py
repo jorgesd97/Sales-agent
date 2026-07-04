@@ -3,7 +3,6 @@ from google.genai import types
 import logging
 
 from config.settings import settings
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 logger = logging.getLogger(__name__)
 
