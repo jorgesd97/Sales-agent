@@ -9,7 +9,22 @@ logger = logging.getLogger(__name__)
 
 class VerificationAgent:
     def __init__(self):
-        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        import os
+        from google.oauth2 import service_account
+        
+        # 1. Cargamos explícitamente el archivo JSON que tu función setup_google_credentials() escribió en el disco
+        creds_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+        scopes = ["https://www.googleapis.com/auth/cloud-platform"]
+        credentials = service_account.Credentials.from_service_account_file(
+        creds_path, 
+        scopes=scopes  # <-- ESTO SOLUCIONA EL "INVALID_SCOPE"
+    )
+        self.client = genai.Client(
+        vertexai=True,
+        project=settings.GOOGLE_CLOUD_PROJECT,
+        location=settings.GOOGLE_CLOUD_LOCATION,
+        credentials=credentials 
+    )
         self.config = types.GenerateContentConfig(
             temperature=0,
             max_output_tokens=300,

@@ -2,8 +2,11 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    # Gemini
-    GEMINI_API_KEY: str
+    # Vertex AI
+    GOOGLE_CLOUD_PROJECT: str
+    GOOGLE_CLOUD_LOCATION: str = "us-central1"
+    GOOGLE_APPLICATION_CREDENTIALS_JSON: str  # el JSON completo como string
+
     GEMINI_FLASH_MODEL_LOW: str = "gemini-2.5-flash"
     GEMINI_FLASH_MODEL_HIGH: str = "gemini-2.5-flash"
 

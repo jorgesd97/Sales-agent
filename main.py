@@ -1,3 +1,6 @@
+from config.gcp_auth import setup_google_credentials
+setup_google_credentials()
+
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
