@@ -1,6 +1,6 @@
 from config.gcp_auth import setup_google_credentials
 setup_google_credentials()
-
+from datetime import datetime
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
@@ -49,10 +49,13 @@ async def chat(request: ChatRequest, api_key: str = Depends(verify_api_key)):
             request.session_id,
             table_name=request.memory_table,
         )
-
+        current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+        time_context = f"CONTEXTO TEMPORAL ACTUAL: Hoy es {current_time_str}.\n\n"
+        full_system_prompt = time_context + request.system_prompt
+        
         result = await workflow.run(
             question=request.question,
-            system_prompt=request.system_prompt,
+            system_prompt=full_system_prompt,
             chat_history=chat_history,
             table_name=request.table_name,
         )
