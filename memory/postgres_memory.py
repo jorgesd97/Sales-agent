@@ -20,7 +20,7 @@ class PostgresMemory:
             cur = conn.cursor()
             cur.execute(
                 f"""
-                SELECT msg_type, message 
+                SELECT msg_type, message, msg_ts
                 FROM {table_name} 
                 WHERE session_id = %s 
                 ORDER BY id DESC 
@@ -38,7 +38,7 @@ class PostgresMemory:
             for row in rows:
                 msg_type = row[0]
                 message = row[1]
-
+                msg_ts = row[2]
                 # message es jsonb, puede venir como dict o string
                 if isinstance(message, str):
                     try:
@@ -48,16 +48,17 @@ class PostgresMemory:
 
                 if isinstance(message, dict):
                     text = message.get("content", "")
+                    
                 else:
                     text = str(message)
 
                 if not text:
                     continue
-
+                timestamp_str = msg_ts.strftime("%Y-%m-%d %H:%M") if msg_ts else "Fecha desconocida"
                 if msg_type == "human":
-                    history += f"Human: {text}\n"
+                    history += f"[{timestamp_str}] Human: {text}\n"
                 elif msg_type == "ai":
-                    history += f"AI: {text}\n"
+                    history += f"[{timestamp_str}] AI: {text}\n"
 
             logger.info(f"Loaded {len(rows)} messages for session {session_id}")
             return history.strip()
