@@ -6,7 +6,8 @@ from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 from typing import Optional
 import logging
-
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from agents.workflow import AgentWorkflow
 from memory.postgres_memory import PostgresMemory
 from config.settings import settings
@@ -49,8 +50,12 @@ async def chat(request: ChatRequest, api_key: str = Depends(verify_api_key)):
             request.session_id,
             table_name=request.memory_table,
         )
-        current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-        time_context = f"CONTEXTO TEMPORAL ACTUAL: Hoy es {current_time_str}.\n\n"
+        lima_tz = ZoneInfo("America/Lima")
+        now_lima = datetime.now(lima_tz)
+        dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+        dia_semana = dias[now_lima.weekday()]
+        current_time_str = now_lima.strftime(f"{dia_semana} %d de %B de %Y, %I:%M %p")
+        time_context = f"CONTEXTO TEMPORAL ACTUAL: Hoy es {current_time_str} (hora de Lima, Perú).\n\n"
         full_system_prompt = time_context + request.system_prompt
         
         result = await workflow.run(
