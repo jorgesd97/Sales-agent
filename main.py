@@ -53,14 +53,18 @@ async def chat(request: ChatRequest, api_key: str = Depends(verify_api_key)):
         lima_tz = ZoneInfo("America/Lima")
         now_lima = datetime.now(lima_tz)
         dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+        meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", 
+                "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
         dia_semana = dias[now_lima.weekday()]
-        current_time_str = now_lima.strftime(f"{dia_semana} %d de %B de %Y, %I:%M %p")
-        time_context = f"CONTEXTO TEMPORAL ACTUAL: Hoy es {current_time_str} (hora de Lima, Perú).\n\n"
-        full_system_prompt = time_context + request.system_prompt
-        
+        mes = meses[now_lima.month - 1]
+        current_time_str = f"{dia_semana} {now_lima.day} de {mes} de {now_lima.year}, {now_lima.strftime('%H:%M')} horas (formato 24h)"
+        question_with_time = (
+            f"[Fecha y hora actual en Lima, Perú: {current_time_str}]\n\n"
+            f"{request.question}"
+        )
         result = await workflow.run(
-            question=request.question,
-            system_prompt=full_system_prompt,
+            question=question_with_time,
+            system_prompt=request.system_prompt,
             chat_history=chat_history,
             table_name=request.table_name,
         )
