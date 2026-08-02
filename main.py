@@ -39,7 +39,6 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     answer: str
-    is_relevant: bool
     verification_report: Optional[str] = ""
 
 
@@ -78,7 +77,6 @@ async def chat(request: ChatRequest, api_key: str = Depends(verify_api_key)):
 
         return ChatResponse(
             answer=result["answer"],
-            is_relevant=result["is_relevant"],
             verification_report=result.get("verification_report", ""),
         )
 

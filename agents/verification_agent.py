@@ -1,6 +1,8 @@
 from google import genai
 from google.genai import types
 import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from config.settings import settings
 
@@ -49,55 +51,69 @@ class VerificationAgent:
             ]
         )
 
-    async def check(self, answer: str, context: str) -> dict:
-        prompt = f"""
-You are an AI assistant designed to verify the accuracy and relevance of answers based on provided context.
-
-**Instructions:**
-- Verify the following answer against the provided context.
-- Check for:
-  1. Direct/indirect factual support (YES/NO)
-  2. Unsupported claims (list any if present)
-  3. Contradictions (list any if present)
-  4. Relevance to the question (YES/NO)
-
-**Format:**
-Supported: YES/NO
-Unsupported Claims: [item1, item2, ...]
-Contradictions: [item1, item2, ...]
-Relevant: YES/NO
-
-**Answer:** {answer}
-**Context:**
+    async def check(self, answer: str, chat_history: str, system_prompt: str, context: str = "") -> dict:
+        context_section = ""
+        lima_tz = ZoneInfo("America/Lima")
+        now_lima = datetime.now(lima_tz)
+        dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+        meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", 
+                "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+        dia_semana = dias[now_lima.weekday()]
+        mes = meses[now_lima.month - 1]
+        current_time_str = f"{dia_semana} {now_lima.day} de {mes} de {now_lima.year}, {now_lima.strftime('%H:%M')} horas (formato 24h)"
+        if context:
+            context_section = f"""
+**Knowledge Base (para verificar datos de productos/precios):**
 {context}
+"""
 
-**Respond ONLY with the above format.**
+        prompt = f"""[Fecha y hora actual en Lima, Perú: {current_time_str}]\n\n
+        You are a sales flow verifier. Your job is to check whether a proposed response follows the sales flow correctly given the conversation history.
+
+**Check the following:**
+1. Does the response respect the sales flow defined in the system prompt (does not skip mandatory steps)?
+2. Does the response ask for information the customer has ALREADY provided in the chat history? (error)
+3. Are there any temporal inconsistencies? (offering a time that has already passed, treating "tomorrow" as "today", etc.)
+4. Does the response repeat obsolete or textually identical information from a previous turn?
+5. Does the response invent products or prices not found in the knowledge base (if provided)?
+
+**System Prompt (contains the expected sales flow):**
+{system_prompt}
+
+**Chat History:**
+{chat_history}
+
+**Proposed Response:**
+{answer}
+{context_section}
+**Respond ONLY with the following format:**
+Flujo_correcto: YES/NO
+Problemas: [brief list of detected problems, or "ninguno"]
 """
 
         try:
-            # 3. Llamamos al modelo desde el cliente, pasando el modelo y la configuración guardada
             response = self.client.models.generate_content(
-                model=settings.GEMINI_FLASH_MODEL_LOW, # Asegúrate de que sea por ejemplo 'gemini-2.5-flash'
+                model=settings.GEMINI_FLASH_MODEL_LOW,
                 contents=prompt,
                 config=self.config
             )
-            
+
+            if not response.text:
+                logger.warning("Verification returned empty response, fail-open")
+                return {"verification_report": "Empty response from verifier", "is_valid": True}
+
             report = response.text.strip()
-            logger.info("Verification report generated")
+            logger.info(f"Verification report: {report}")
 
             parsed = self._parse_report(report)
             return {
                 "verification_report": report,
-                "is_valid": parsed.get("supported") == "YES"
-                and parsed.get("relevant") == "YES",
+                "is_valid": parsed.get("flujo_correcto") == "YES",
             }
 
         except Exception as e:
             logger.error(f"Verification error: {e}")
-            return {
-                "verification_report": "Verification failed",
-                "is_valid": False,
-            }
+            return {"verification_report": f"Verification error: {e}", "is_valid": True}
 
     def _parse_report(self, report: str) -> dict:
         parsed = {}
@@ -106,8 +122,6 @@ Relevant: YES/NO
                 key, value = line.split(":", 1)
                 key = key.strip().lower()
                 value = value.strip().upper()
-                if key == "supported":
-                    parsed["supported"] = value
-                elif key == "relevant":
-                    parsed["relevant"] = value
+                if key == "flujo_correcto":
+                    parsed["flujo_correcto"] = value
         return parsed

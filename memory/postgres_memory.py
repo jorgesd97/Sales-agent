@@ -14,7 +14,7 @@ class PostgresMemory:
     def _get_connection(self):
         return psycopg.connect(self.conn_string)
 
-    def get_history(self, session_id: str, table_name: str = "demo_chat_db", limit: int = 10) -> str:
+    def get_history(self, session_id: str, table_name: str = "demo_chat_db", limit: int = 30) -> str:
         try:
             conn = self._get_connection()
             cur = conn.cursor()

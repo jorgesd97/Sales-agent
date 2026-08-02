@@ -2,7 +2,6 @@ from langgraph.graph import StateGraph, END
 from typing import TypedDict
 import logging
 
-from .relevance_checker import RelevanceChecker
 from .research_agent import ResearchAgent
 from .verification_agent import VerificationAgent
 from retriever.supabase_retriever import SupabaseRetriever
@@ -15,7 +14,6 @@ class AgentState(TypedDict):
     context: str
     draft_answer: str
     verification_report: str
-    is_relevant: bool
     is_valid: bool
     system_prompt: str
     chat_history: str
@@ -25,7 +23,6 @@ class AgentState(TypedDict):
 
 class AgentWorkflow:
     def __init__(self):
-        self.relevance_checker = RelevanceChecker()
         self.researcher = ResearchAgent()
         self.verifier = VerificationAgent()
         self.retriever = SupabaseRetriever()
@@ -34,20 +31,12 @@ class AgentWorkflow:
     def _build(self):
         workflow = StateGraph(AgentState)
 
-        # Nodos
         workflow.add_node("retrieve", self._retrieve_step)
-        workflow.add_node("check_relevance", self._check_relevance_step)
         workflow.add_node("research", self._research_step)
         workflow.add_node("verify", self._verify_step)
 
-        # Flujo
         workflow.set_entry_point("retrieve")
-        workflow.add_edge("retrieve", "check_relevance")
-        workflow.add_conditional_edges(
-            "check_relevance",
-            self._decide_after_relevance,
-            {"relevant": "research", "irrelevant": END},
-        )
+        workflow.add_edge("retrieve", "research")
         workflow.add_edge("research", "verify")
         workflow.add_conditional_edges(
             "verify",
@@ -70,21 +59,6 @@ class AgentWorkflow:
             logger.info(f"Chunk {i}: {doc['content'][:100]}...")
         return {"context": context}
 
-    async def _check_relevance_step(self, state: AgentState) -> dict:
-        classification = await self.relevance_checker.check(
-            question=state["question"],
-            context=state["context"],
-        )
-
-        if classification.startswith("CAN") or classification == "PARTIAL":
-            return {"is_relevant": True}
-
-        # NO_MATCH pero no borramos el contexto
-        return {"is_relevant": True}
-
-    def _decide_after_relevance(self, state: AgentState) -> str:
-        return "relevant" if state["is_relevant"] else "irrelevant"
-
     async def _research_step(self, state: AgentState) -> dict:
         logger.info(f"Context length: {len(state['context'])} chars")
         logger.info(f"Context preview: {state['context'][:200]}...")
@@ -101,7 +75,9 @@ class AgentWorkflow:
     async def _verify_step(self, state: AgentState) -> dict:
         result = await self.verifier.check(
             answer=state["draft_answer"],
-            context=state["context"],
+            chat_history=state.get("chat_history", ""),
+            system_prompt=state.get("system_prompt", ""),
+            context=state.get("context", ""),
         )
         return {
             "verification_report": result["verification_report"],
@@ -130,7 +106,6 @@ class AgentWorkflow:
             context="",
             draft_answer="",
             verification_report="",
-            is_relevant=False,
             is_valid=False,
             system_prompt=system_prompt,
             chat_history=chat_history,
@@ -143,5 +118,4 @@ class AgentWorkflow:
         return {
             "answer": final_state["draft_answer"],
             "verification_report": final_state.get("verification_report", ""),
-            "is_relevant": final_state["is_relevant"],
         }
