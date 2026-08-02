@@ -52,6 +52,9 @@ class VerificationAgent:
         )
 
     async def check(self, answer: str, chat_history: str, system_prompt: str, context: str = "") -> dict:
+        logger.info(f"[VERIFIER] chat_history recibido ({len(chat_history)} chars): {chat_history}")
+        logger.info(f"[VERIFIER] context recibido ({len(context)} chars): {context[:300]}")
+        logger.info(f"[VERIFIER] answer a verificar: {answer}")
         context_section = ""
         lima_tz = ZoneInfo("America/Lima")
         now_lima = datetime.now(lima_tz)
