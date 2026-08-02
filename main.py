@@ -9,6 +9,7 @@ import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from agents.workflow import AgentWorkflow
+from agents.sales_classifier import SalesClassifier
 from memory.postgres_memory import PostgresMemory
 from config.settings import settings
 
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Sales Agent API", docs_url=None, redoc_url=None, openapi_url=None)
 workflow = AgentWorkflow()
+classifier = SalesClassifier()
 memory = PostgresMemory()
 
 # API Key Security
@@ -82,6 +84,37 @@ async def chat(request: ChatRequest, api_key: str = Depends(verify_api_key)):
 
     except Exception as e:
         logger.error(f"Chat error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class ClasificarVentaRequest(BaseModel):
+    session_id: str
+    sales_criteria: str
+    memory_table: str = "demo_chat_db"
+
+
+@app.post("/clasificar-venta")
+async def clasificar_venta(request: ClasificarVentaRequest, api_key: str = Depends(verify_api_key)):
+    try:
+        chat_history = memory.get_history(
+            request.session_id,
+            table_name=request.memory_table,
+        )
+        result = await classifier.classify(
+            chat_history=chat_history,
+            sales_criteria=request.sales_criteria,
+        )
+
+        monto = (result.get("datos_venta") or {}).get("monto") or "SIN_MONTO"
+        fecha_voucher = (result.get("datos_venta") or {}).get("fecha_voucher") or "SIN_FECHA"
+        monto_limpio = monto.replace("S/", "").replace(" ", "").strip()
+        llave = f"{request.session_id}_{monto_limpio}_{fecha_voucher}"
+        result["llave"] = llave
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Clasificar venta error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
