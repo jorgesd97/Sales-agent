@@ -63,23 +63,19 @@ class VerificationAgent:
         current_time_str = f"{dia_semana} {now_lima.day} de {mes} de {now_lima.year}, {now_lima.strftime('%H:%M')} horas (formato 24h)"
         if context:
             context_section = f"""
-**Knowledge Base (to verify product/price data):**
+**Knowledge Base (para verificar datos de productos/precios):**
 {context}
 """
-        prompt = f"""[Current date and time in Lima, Peru: {current_time_str}]
 
-You are a sales flow verifier. Your job is to check whether a proposed response follows the sales flow correctly given the conversation history.
+        prompt = f"""[Current date and time in Lima, Peru: {current_time_str}]
+        You are a sales flow verifier. Your job is to check whether a proposed response follows the sales flow correctly given the conversation history.
 
 **Check the following:**
 1. Does the response respect the sales flow defined in the system prompt (does not skip mandatory steps)?
 2. Does the response ask for information the customer has ALREADY provided in the chat history? (error)
-3. Are there any temporal inconsistencies? Use ONLY the current date/time provided above as your reference. Do NOT recalculate the day of the week yourself — trust the date given. Flag a problem only if the response clearly contradicts the provided current date (e.g. offering a time that has already passed, or stating a wrong "tomorrow" relative to the given date).
-4. Does the response repeat obsolete information, or copy an earlier turn word-for-word?
-5. Does the response invent products or prices not found in the knowledge base (if provided)?
-
-**Severity calibration (IMPORTANT):**
-Mark "NO" ONLY when there is a CLEAR, CONCRETE error that would harm the sale or confuse the customer — for example: requesting payment before collecting the required data, asking for a datum the customer already gave, or a real temporal contradiction against the current date provided above.
-Do NOT mark "NO" for stylistic issues, tone, "incomplete" benefit descriptions, missing emojis, or minor wording. If the response is useful and correct for the customer, mark "YES". When in doubt, mark "YES".
+3. Are there any temporal inconsistencies? (offering a time that has already passed, treating "tomorrow" as "today", etc.)
+4. Does the response repeat obsolete or textually identical information from a previous turn?
+5. Does the response invent rules, products or prices not found in the knowledge base (if provided)?
 
 **System Prompt (contains the expected sales flow):**
 {system_prompt}
