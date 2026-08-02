@@ -105,10 +105,19 @@ async def clasificar_venta(request: ClasificarVentaRequest, api_key: str = Depen
             sales_criteria=request.sales_criteria,
         )
 
-        monto = (result.get("datos_venta") or {}).get("monto") or "SIN_MONTO"
-        fecha_voucher = (result.get("datos_venta") or {}).get("fecha_voucher") or "SIN_FECHA"
+        datos_venta = result.get("datos_venta") or {}
+        if not datos_venta.get("numero_telefono"):
+            datos_venta["numero_telefono"] = request.session_id
+        result["datos_venta"] = datos_venta
+
+        monto = datos_venta.get("monto") or "SIN_MONTO"
+        fecha_voucher = datos_venta.get("fecha_voucher") or "SIN_FECHA"
+        fecha_limpia = fecha_voucher.strip()
+        if " - " in fecha_limpia:
+            fecha_limpia = fecha_limpia.split(" - ")[0].strip()
+        fecha_limpia = fecha_limpia.replace(" ", "").replace(".", "")
         monto_limpio = monto.replace("S/", "").replace(" ", "").strip()
-        llave = f"{request.session_id}_{monto_limpio}_{fecha_voucher}"
+        llave = f"{request.session_id}_{monto_limpio}_{fecha_limpia}"
         result["llave"] = llave
 
         return result

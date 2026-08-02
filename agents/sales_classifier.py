@@ -58,6 +58,9 @@ class SalesClassifier:
 2. Check each criterion from the sales criteria against the conversation. Be STRICT: mark datos_completos as false if ANY criterion is missing.
 3. Extract the sale data from the conversation. If a data point is NOT found in the conversation, set it as null and list it in datos_faltantes. Do NOT invent data.
 
+Note: do NOT flag "numero_telefono" as missing — it is provided by the system, not extracted from the conversation. Leave it as null; the backend will fill it.
+For "fecha_voucher": extract ONLY the date (no time) and return it in strict format YYYY-MM-DD. Convert Spanish month names/abbreviations to numbers (e.g. "02 Ago. 2026" -> "2026-08-02", "15 de julio de 2026" -> "2026-07-15"). If the date cannot be determined, use null.
+
 **Sales Criteria:**
 {sales_criteria}
 
@@ -74,9 +77,9 @@ class SalesClassifier:
     "monto": "..." or null,
     "fecha_entrega": "..." or null,
     "nombre": "..." or null,
-    "whatsapp": "..." or null,
+    "numero_telefono": "..." or null,
     "direccion": "..." or null,
-    "fecha_voucher": "..." or null
+    "fecha_voucher": "YYYY-MM-DD" or null
   }}
 }}
 """
