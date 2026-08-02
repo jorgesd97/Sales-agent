@@ -62,12 +62,19 @@ class AgentWorkflow:
     async def _research_step(self, state: AgentState) -> dict:
         logger.info(f"Context length: {len(state['context'])} chars")
         logger.info(f"Context preview: {state['context'][:200]}...")
-        
+
+        retry_count = state.get("retry_count", 0)
+        feedback = ""
+        if retry_count > 0:
+            feedback = state.get("verification_report", "")
+            logger.info(f"Retry with correction feedback: {feedback}")
+
         answer = await self.researcher.generate(
             question=state["question"],
             context=state["context"],
             system_prompt=state.get("system_prompt", ""),
             chat_history=state.get("chat_history", ""),
+            correction_feedback=feedback,
         )
         logger.info(f"Draft answer: {answer[:150]}...")
         return {"draft_answer": answer}
@@ -75,9 +82,9 @@ class AgentWorkflow:
     async def _verify_step(self, state: AgentState) -> dict:
         result = await self.verifier.check(
             answer=state["draft_answer"],
+            question=state["question"],
             chat_history=state.get("chat_history", ""),
             system_prompt=state.get("system_prompt", ""),
-            context=state.get("context", ""),
         )
         return {
             "verification_report": result["verification_report"],

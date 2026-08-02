@@ -55,7 +55,17 @@ class ResearchAgent:
         context: str,
         system_prompt: str = "",
         chat_history: str = "",
+        correction_feedback: str = "",
     ) -> str:
+        correction_section = ""
+        if correction_feedback:
+            correction_section = f"""
+
+**IMPORTANTE — Tu respuesta anterior fue rechazada por el verificador de flujo. Motivo:**
+{correction_feedback}
+Genera una nueva respuesta que corrija ese problema específico. No repitas el mismo error.
+"""
+
         prompt = f"""
 {system_prompt}
 
@@ -72,7 +82,7 @@ class ResearchAgent:
 
 **Context:**
 {context}
-
+{correction_section}
 **Provide your answer below:**
 """
 

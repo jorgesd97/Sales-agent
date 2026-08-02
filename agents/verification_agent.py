@@ -51,44 +51,37 @@ class VerificationAgent:
             ]
         )
 
-    async def check(self, answer: str, chat_history: str, system_prompt: str, context: str = "") -> dict:
-        logger.info(f"[VERIFIER] chat_history recibido ({len(chat_history)} chars): {chat_history}")
-        logger.info(f"[VERIFIER] context recibido ({len(context)} chars): {context[:300]}")
-        logger.info(f"[VERIFIER] answer a verificar: {answer}")
-        context_section = ""
+    async def check(self, answer: str, question: str, chat_history: str, system_prompt: str) -> dict:
         lima_tz = ZoneInfo("America/Lima")
         now_lima = datetime.now(lima_tz)
         dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
-        meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", 
+        meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
                 "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
         dia_semana = dias[now_lima.weekday()]
         mes = meses[now_lima.month - 1]
         current_time_str = f"{dia_semana} {now_lima.day} de {mes} de {now_lima.year}, {now_lima.strftime('%H:%M')} horas (formato 24h)"
-        if context:
-            context_section = f"""
-**Knowledge Base (para verificar datos de productos/precios):**
-{context}
-"""
 
         prompt = f"""[Current date and time in Lima, Peru: {current_time_str}]
-        You are a sales flow verifier. Your job is to check whether a proposed response follows the sales flow correctly given the conversation history.
+You are a sales flow verifier. Your job is to check whether a proposed response follows the sales flow correctly given the conversation history.
 
 **Check the following:**
 1. Does the response respect the sales flow defined in the system prompt (does not skip mandatory steps)?
-2. Does the response ask for information the customer has ALREADY provided in the chat history? (error)
+2. Does the response ask for information the customer has ALREADY provided in the chat history or in the current customer message? (error)
 3. Are there any temporal inconsistencies? (offering a time that has already passed, treating "tomorrow" as "today", etc.)
 4. Does the response repeat obsolete or textually identical information from a previous turn?
-5. Does the response invent rules, products or prices not found in the knowledge base (if provided)?
 
 **System Prompt (contains the expected sales flow):**
 {system_prompt}
 
-**Chat History:**
+**Current customer message (the message the response is replying to):**
+{question}
+
+**Chat History (previous messages):**
 {chat_history}
 
 **Proposed Response:**
 {answer}
-{context_section}
+
 **Respond ONLY with the following format:**
 Flujo_correcto: YES/NO
 Problemas: [brief list of detected problems, or "ninguno"]
@@ -111,7 +104,7 @@ Problemas: [brief list of detected problems, or "ninguno"]
             parsed = self._parse_report(report)
             return {
                 "verification_report": report,
-                "is_valid": parsed.get("flujo_correcto") == "YES",
+                "is_valid": "YES" in parsed.get("flujo_correcto", ""),
             }
 
         except Exception as e:
