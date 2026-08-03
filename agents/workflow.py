@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 class AgentState(TypedDict):
     question: str
+    question_clean: str
     context: str
     draft_answer: str
     verification_report: str
@@ -82,7 +83,7 @@ class AgentWorkflow:
     async def _verify_step(self, state: AgentState) -> dict:
         result = await self.verifier.check(
             answer=state["draft_answer"],
-            question=state["question"],
+            question=state["question_clean"],
             chat_history=state.get("chat_history", ""),
             system_prompt=state.get("system_prompt", ""),
         )
@@ -104,6 +105,7 @@ class AgentWorkflow:
     async def run(
         self,
         question: str,
+        question_clean: str = "",
         system_prompt: str = "",
         chat_history: str = "",
         table_name: str = "kb_demo",

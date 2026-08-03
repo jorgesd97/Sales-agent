@@ -65,6 +65,7 @@ async def chat(request: ChatRequest, api_key: str = Depends(verify_api_key)):
         )
         result = await workflow.run(
             question=question_with_time,
+            question_clean=request.question,
             system_prompt=request.system_prompt,
             chat_history=chat_history,
             table_name=request.table_name,

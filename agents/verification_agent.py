@@ -60,33 +60,35 @@ class VerificationAgent:
         dia_semana = dias[now_lima.weekday()]
         mes = meses[now_lima.month - 1]
         current_time_str = f"{dia_semana} {now_lima.day} de {mes} de {now_lima.year}, {now_lima.strftime('%H:%M')} horas (formato 24h)"
+        conversacion = f"{chat_history}\n[CLIENTE]: {question}"
 
         prompt = f"""[Current date and time in Lima, Peru: {current_time_str}]
-You are a sales flow verifier. Your job is to check whether a proposed response follows the sales flow correctly given the conversation history.
 
-**Check the following:**
-1. Does the response respect the sales flow defined in the system prompt (does not skip mandatory steps)?
-2. Does the response ask for information the customer has ALREADY provided in the chat history or in the current customer message? (error)
-3. Are there any temporal inconsistencies? (offering a time that has already passed, treating "tomorrow" as "today", etc.)
-4. Does the response repeat obsolete or textually identical information from a previous turn?
+You are a sales flow verifier. Below is a sales conversation in chronological order between a CUSTOMER and the SELLER (an AI assistant). After the conversation there is a PROPOSED SELLER RESPONSE that you must evaluate.
 
-**System Prompt (contains the expected sales flow):**
+In the conversation, "Human" or "[CLIENTE]" means the CUSTOMER, and "AI" means the SELLER. The PROPOSED SELLER RESPONSE is the seller's reply to the LAST customer message in the conversation.
+
+**System Prompt (expected sales flow):**
 {system_prompt}
 
-**Current customer message (the message the response is replying to):**
-{question}
+**CONVERSATION (chronological order):**
+{conversacion}
 
-**Chat History (previous messages):**
-{chat_history}
-
-**Proposed Response:**
+**PROPOSED SELLER RESPONSE (evaluate THIS):**
 {answer}
+
+**Check the following about the PROPOSED SELLER RESPONSE:**
+1. Does it respect the sales flow (does not skip mandatory steps)?
+2. Does it ask for information the customer has ALREADY provided anywhere in the conversation above?
+3. Are there temporal inconsistencies against the current date/time given above? (offering a time already passed, treating "tomorrow" as "today", etc.)
+4. Does it repeat information textually identical to a previous SELLER turn?
+
+If the SELLER previously asked something (e.g. "would you like to see the image?") and the CUSTOMER's last message confirms it (e.g. "sí", "si pf", "dale", "ok"), then the seller acting on that confirmation is CORRECT flow, not an error.
 
 **Respond ONLY with the following format:**
 Flujo_correcto: YES/NO
 Problemas: [brief list of detected problems, or "ninguno"]
 """
-
         try:
             response = self.client.models.generate_content(
                 model=settings.GEMINI_FLASH_MODEL_LOW,
