@@ -112,6 +112,7 @@ class AgentWorkflow:
     ) -> dict:
         initial_state = AgentState(
             question=question,
+            question_clean=question_clean,
             context="",
             draft_answer="",
             verification_report="",
