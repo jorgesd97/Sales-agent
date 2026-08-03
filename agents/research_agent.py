@@ -52,51 +52,41 @@ class ResearchAgent:
     async def generate(
         self,
         question: str,
-        context: str,
+        current_time: str = "",
+        context: str = "",
         system_prompt: str = "",
         chat_history: str = "",
-        correction_feedback: str = "",
     ) -> str:
-        correction_section = ""
-        if correction_feedback:
-            correction_section = f"""
+        prompt = f"""{system_prompt}
 
-**IMPORTANTE — Tu respuesta anterior fue rechazada por el verificador de flujo. Motivo:**
-{correction_feedback}
-Genera una nueva respuesta que corrija ese problema específico. No repitas el mismo error.
-"""
+=== FECHA Y HORA ACTUAL (Lima, Perú) ===
+{current_time}
+Usa SIEMPRE esta fecha/hora como referencia para cualquier cálculo temporal (si un horario ya pasó, cuándo es "hoy"/"mañana", etc.). Calcula internamente, nunca narres el cálculo.
 
-        prompt = f"""
-{system_prompt}
-
-**Chat History:**
+**Historial de conversación:**
 {chat_history}
 
-**Instructions:**
-- Answer the following question using ONLY the provided context.
-- Be clear, concise, and factual.
-- If the context doesn't contain enough information, say so honestly.
-- Do NOT invent information that is not in the context.
-
-**Question:** {question}
-
-**Context:**
+**Contexto (base de conocimiento):**
 {context}
-{correction_section}
-**Provide your answer below:**
-"""
 
+**Instrucciones:**
+- Responde usando ÚNICAMENTE la información del contexto. No inventes datos que no estén ahí.
+- Si el contexto no tiene la información, dilo honestamente.
+- Sé claro y conciso.
+
+**Mensaje actual del cliente:** {question}
+
+**Tu respuesta:**
+"""
         try:
-            # 3. Consumimos el modelo desde el cliente unificado
             response = self.client.models.generate_content(
                 model=settings.GEMINI_FLASH_MODEL_HIGH,
                 contents=prompt,
-                config=self.config
+                config=self.config,
             )
             answer = response.text.strip()
             logger.info(f"Research agent generated answer for: '{question}'")
             return answer
-
         except Exception as e:
             logger.error(f"Research agent error: {e}")
             return "Lo siento, hubo un error al procesar tu consulta."

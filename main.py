@@ -4,7 +4,6 @@ from datetime import datetime
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
-from typing import Optional
 import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -35,14 +34,12 @@ class ChatRequest(BaseModel):
     question: str
     session_id: str
     system_prompt: str = ""
-    sales_flow: str = ""
     table_name: str = "kb_demo"
     memory_table: str = "demo_chat_db"
 
 
 class ChatResponse(BaseModel):
     answer: str
-    verification_report: Optional[str] = ""
 
 
 @app.post("/chat", response_model=ChatResponse)
@@ -60,15 +57,10 @@ async def chat(request: ChatRequest, api_key: str = Depends(verify_api_key)):
         dia_semana = dias[now_lima.weekday()]
         mes = meses[now_lima.month - 1]
         current_time_str = f"{dia_semana} {now_lima.day} de {mes} de {now_lima.year}, {now_lima.strftime('%H:%M')} horas (formato 24h)"
-        question_with_time = (
-            f"[Fecha y hora actual en Lima, Perú: {current_time_str}]\n\n"
-            f"{request.question}"
-        )
         result = await workflow.run(
-            question=question_with_time,
-            question_clean=request.question,
+            question=request.question,
+            current_time=current_time_str,
             system_prompt=request.system_prompt,
-            sales_flow=request.sales_flow,
             chat_history=chat_history,
             table_name=request.table_name,
         )
@@ -80,10 +72,7 @@ async def chat(request: ChatRequest, api_key: str = Depends(verify_api_key)):
             table_name=request.memory_table,
         )
 
-        return ChatResponse(
-            answer=result["answer"],
-            verification_report=result.get("verification_report", ""),
-        )
+        return ChatResponse(answer=result["answer"])
 
     except Exception as e:
         logger.error(f"Chat error: {e}")
