@@ -51,7 +51,7 @@ class VerificationAgent:
             ]
         )
 
-    async def check(self, answer: str, question: str, chat_history: str, system_prompt: str) -> dict:
+    async def check(self, answer: str, question: str, chat_history: str, sales_flow: str) -> dict:
         lima_tz = ZoneInfo("America/Lima")
         now_lima = datetime.now(lima_tz)
         dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
@@ -68,8 +68,8 @@ You are a sales flow verifier. Below is a sales conversation in chronological or
 
 In the conversation, "Human" or "[CLIENTE]" means the CUSTOMER, and "AI" means the SELLER. The PROPOSED SELLER RESPONSE is the seller's reply to the LAST customer message in the conversation.
 
-**System Prompt (expected sales flow):**
-{system_prompt}
+**Sales Flow (the steps and non-negotiable rules the response MUST respect):**
+{sales_flow}
 
 **CONVERSATION (chronological order):**
 {conversacion}

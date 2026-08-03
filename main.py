@@ -35,6 +35,7 @@ class ChatRequest(BaseModel):
     question: str
     session_id: str
     system_prompt: str = ""
+    sales_flow: str = ""
     table_name: str = "kb_demo"
     memory_table: str = "demo_chat_db"
 
@@ -67,6 +68,7 @@ async def chat(request: ChatRequest, api_key: str = Depends(verify_api_key)):
             question=question_with_time,
             question_clean=request.question,
             system_prompt=request.system_prompt,
+            sales_flow=request.sales_flow,
             chat_history=chat_history,
             table_name=request.table_name,
         )

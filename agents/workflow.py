@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 class AgentState(TypedDict):
     question: str
     question_clean: str
+    sales_flow: str
     context: str
     draft_answer: str
     verification_report: str
@@ -85,7 +86,7 @@ class AgentWorkflow:
             answer=state["draft_answer"],
             question=state["question_clean"],
             chat_history=state.get("chat_history", ""),
-            system_prompt=state.get("system_prompt", ""),
+            sales_flow=state.get("sales_flow", ""),
         )
         return {
             "verification_report": result["verification_report"],
@@ -107,12 +108,14 @@ class AgentWorkflow:
         question: str,
         question_clean: str = "",
         system_prompt: str = "",
+        sales_flow: str = "",
         chat_history: str = "",
         table_name: str = "kb_demo",
     ) -> dict:
         initial_state = AgentState(
             question=question,
             question_clean=question_clean,
+            sales_flow=sales_flow,
             context="",
             draft_answer="",
             verification_report="",
