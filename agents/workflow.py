@@ -97,7 +97,7 @@ class AgentWorkflow:
     def _decide_after_verify(self, state: AgentState) -> str:
         if state["is_valid"]:
             return "valid"
-        if state.get("retry_count", 0) >= 1:
+        if state.get("retry_count", 0) >= 2:
             logger.warning("Max retries reached, ending workflow")
             return "fail"
         logger.info("Verification failed, retrying research")
