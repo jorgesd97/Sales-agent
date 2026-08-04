@@ -60,13 +60,13 @@ class RouterAgent:
 
 RULES (evaluate in this order):
 - If the current message contains the marker [COMPROBANTE_PAGO] → "validacion"
+- If the Product type is Físico and the shipping cost has NOT been calculated yet in the conversation history (no shipping amount mentioned by the seller), you MUST route to "logistica" before "confirmacion_datos" — even if the customer already gave their location or data → "logistica"
 - If payment info was already shown AND all required data is collected → "pago"
 - If products are chosen AND delivery data is still missing → "confirmacion_datos"
 - If the customer has already chosen specific products AND no promotion/discount has been offered yet in the conversation history, OR the customer explicitly asks about discounts/promotions ("¿tienen descuento?", "¿hay promoción?", "¿hay oferta?") → "promociones"
 - If the customer is interested but still has questions/objections → "objeciones"
 - If the customer explicitly asks to ADD another product to the order (action, not just asking about it) → "agregar_producto"
 - If the customer is new or just showing initial interest → "bienvenida"
-- If the product is PHYSICAL and shipping cost hasn't been discussed yet, and the customer provided or is discussing their location → "logistica"
 
 IMPORTANT about "promociones": if the AI already offered a promotion earlier in the conversation history, do NOT route to "promociones" again — the promotion was already handled. Only route there once per conversation.
 
