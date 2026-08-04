@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 RETRIEVE_QUERIES = {
     "bienvenida": None,
     "objeciones": None,
+    "promociones": "promociones descuentos ofertas",
     "logistica": "políticas de despacho envío costo",
     "confirmacion_datos": None,
     "pago": "métodos de pago",
@@ -21,6 +22,7 @@ RETRIEVE_QUERIES = {
 PROMPT_KEYS = {
     "bienvenida": "bienvenida",
     "objeciones": "objeciones",
+    "promociones": "promociones",
     "logistica": "logistica",
     "confirmacion_datos": "datos",
     "pago": "pago",
@@ -55,6 +57,7 @@ class AgentWorkflow:
         workflow.add_node("enrutador", self._router_step)
         workflow.add_node("bienvenida", self._make_stage_step("bienvenida"))
         workflow.add_node("objeciones", self._make_stage_step("objeciones"))
+        workflow.add_node("promociones", self._make_stage_step("promociones"))
         workflow.add_node("logistica", self._make_stage_step("logistica"))
         workflow.add_node("confirmacion_datos", self._make_stage_step("confirmacion_datos"))
         workflow.add_node("guardian", self._guardian_step)
@@ -70,6 +73,7 @@ class AgentWorkflow:
             {
                 "bienvenida": "bienvenida",
                 "objeciones": "objeciones",
+                "promociones": "promociones",
                 "logistica": "logistica",
                 "confirmacion_datos": "confirmacion_datos",
                 "pago": "guardian",
@@ -80,6 +84,7 @@ class AgentWorkflow:
 
         workflow.add_edge("bienvenida", END)
         workflow.add_edge("objeciones", END)
+        workflow.add_edge("promociones", END)
         workflow.add_edge("logistica", END)
         workflow.add_edge("confirmacion_datos", END)
         workflow.add_edge("pago", END)

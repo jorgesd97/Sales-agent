@@ -9,7 +9,7 @@ from config.settings import settings
 logger = logging.getLogger(__name__)
 
 VALID_STAGES = {
-    "bienvenida", "objeciones", "logistica",
+    "bienvenida", "objeciones", "promociones", "logistica",
     "confirmacion_datos", "pago", "validacion", "agregar_producto",
 }
 
@@ -58,14 +58,17 @@ class RouterAgent:
     async def classify_stage(self, chat_history: str, question: str, naturaleza_producto: str) -> dict:
         prompt = f"""You are a sales conversation router. Given the conversation history and the customer's latest message, determine which sales stage the conversation is currently in.
 
-RULES:
+RULES (evaluate in this order):
 - If the current message contains the marker [COMPROBANTE_PAGO] → "validacion"
 - If payment info was already shown AND all required data is collected → "pago"
 - If products are chosen AND delivery data is still missing → "confirmacion_datos"
+- If the customer has already chosen specific products AND no promotion/discount has been offered yet in the conversation history, OR the customer explicitly asks about discounts/promotions ("¿tienen descuento?", "¿hay promoción?", "¿hay oferta?") → "promociones"
 - If the customer is interested but still has questions/objections → "objeciones"
 - If the customer explicitly asks to ADD another product to the order (action, not just asking about it) → "agregar_producto"
 - If the customer is new or just showing initial interest → "bienvenida"
 - If the product is PHYSICAL and shipping cost hasn't been discussed yet, and the customer provided or is discussing their location → "logistica"
+
+IMPORTANT about "promociones": if the AI already offered a promotion earlier in the conversation history, do NOT route to "promociones" again — the promotion was already handled. Only route there once per conversation.
 
 CRITICAL: Questions do NOT change the transactional stage. If a customer in "bienvenida" asks "do you accept Yape?", the stage stays "bienvenida" — the node will answer the payment question without advancing the sale. Only concrete ACTIONS advance the stage (giving data, confirming an order, sending a receipt).
 
@@ -85,7 +88,7 @@ Product type: {naturaleza_producto}
 Respond ONLY with valid JSON, no additional text, no markdown, no ```json fences:
 {{"etapa": "..."}}
 
-Valid values: bienvenida, objeciones, logistica, confirmacion_datos, pago, validacion, agregar_producto
+Valid values: bienvenida, objeciones, promociones, logistica, confirmacion_datos, pago, validacion, agregar_producto
 """
 
         try:
