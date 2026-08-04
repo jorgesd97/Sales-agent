@@ -54,14 +54,17 @@ class ResearchAgent:
         question: str,
         current_time: str = "",
         context: str = "",
-        system_prompt: str = "",
+        prompt_base: str = "",
+        prompt_nodo: str = "",
         chat_history: str = "",
     ) -> str:
-        prompt = f"""{system_prompt}
+        prompt = f"""{prompt_base}
+
+{prompt_nodo}
 
 === FECHA Y HORA ACTUAL (Lima, Perú) ===
 {current_time}
-Usa SIEMPRE esta fecha/hora como referencia para cualquier cálculo temporal (si un horario ya pasó, cuándo es "hoy"/"mañana", etc.). Calcula internamente, nunca narres el cálculo.
+Usa SIEMPRE esta fecha/hora como referencia para cualquier cálculo temporal (si un horario ya pasó, cuándo es "hoy"/"mañana", etc.). Para saber si un horario de HOY ya pasó, compara SOLO la hora: un horario de hoy ya pasó únicamente si su hora es MENOR que la hora actual. Ejemplo: si son las 03:19 y el cliente pide 10:00, las 10:00 NO han pasado (10 > 3). Calcula internamente, nunca narres el cálculo.
 
 **Historial de conversación:**
 {chat_history}

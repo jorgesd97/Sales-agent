@@ -33,7 +33,9 @@ async def verify_api_key(api_key: str = Depends(api_key_header)):
 class ChatRequest(BaseModel):
     question: str
     session_id: str
-    system_prompt: str = ""
+    prompts: dict = {}
+    naturaleza_producto: str = "FISICO"
+    simbolo_moneda: str = "S/"
     table_name: str = "kb_demo"
     memory_table: str = "demo_chat_db"
 
@@ -60,7 +62,9 @@ async def chat(request: ChatRequest, api_key: str = Depends(verify_api_key)):
         result = await workflow.run(
             question=request.question,
             current_time=current_time_str,
-            system_prompt=request.system_prompt,
+            prompts=request.prompts,
+            naturaleza_producto=request.naturaleza_producto,
+            simbolo_moneda=request.simbolo_moneda,
             chat_history=chat_history,
             table_name=request.table_name,
         )
