@@ -5,7 +5,7 @@ from agents.state import EstadoVenta
 logger = logging.getLogger(__name__)
 
 # Fallback si n8n no envía la plantilla en el campo prompts.
-SALUDO_PLANTILLA_DEFAULT = "¡Buenas! 🌱"
+SALUDO_PLANTILLA_DEFAULT = "¡Buenas! 🌱 Bienvenido/a. Soy Santi de Plant Hero. Revise nuestro catálogo aquí: https://shorturl.at/3xXfk"
 
 
 def _historial_vacio(chat_history: str) -> bool:
