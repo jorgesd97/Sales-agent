@@ -7,7 +7,7 @@ from pydantic import BaseModel
 import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from agents.workflow import AgentWorkflow
+from agents.graph import SalesGraph
 from agents.sales_classifier import SalesClassifier
 from memory.postgres_memory import PostgresMemory
 from config.settings import settings
@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Sales Agent API", docs_url=None, redoc_url=None, openapi_url=None)
-workflow = AgentWorkflow()
+graph = SalesGraph()
 classifier = SalesClassifier()
 memory = PostgresMemory()
 
@@ -59,7 +59,7 @@ async def chat(request: ChatRequest, api_key: str = Depends(verify_api_key)):
         dia_semana = dias[now_lima.weekday()]
         mes = meses[now_lima.month - 1]
         current_time_str = f"{dia_semana} {now_lima.day} de {mes} de {now_lima.year}, {now_lima.strftime('%H:%M')} horas (formato 24h)"
-        result = await workflow.run(
+        result = await graph.run(
             question=request.question,
             current_time=current_time_str,
             prompts=request.prompts,
