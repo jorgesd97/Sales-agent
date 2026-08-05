@@ -15,7 +15,6 @@ RETRIEVE_QUERIES = {
     "logistica": "políticas de despacho envío costo",
     "confirmacion_datos": None,
     "pago": "métodos de pago",
-    "validacion": "métodos de pago validación",
     "agregar_producto": None,
 }
 
@@ -26,7 +25,6 @@ PROMPT_KEYS = {
     "logistica": "logistica",
     "confirmacion_datos": "datos",
     "pago": "pago",
-    "validacion": "validacion",
     "agregar_producto": "agregar",
 }
 
@@ -62,7 +60,6 @@ class AgentWorkflow:
         workflow.add_node("confirmacion_datos", self._make_stage_step("confirmacion_datos"))
         workflow.add_node("guardian", self._guardian_step)
         workflow.add_node("pago", self._make_stage_step("pago"))
-        workflow.add_node("validacion", self._make_stage_step("validacion"))
         workflow.add_node("agregar_producto", self._make_stage_step("agregar_producto"))
 
         workflow.set_entry_point("enrutador")
@@ -77,7 +74,6 @@ class AgentWorkflow:
                 "logistica": "logistica",
                 "confirmacion_datos": "confirmacion_datos",
                 "pago": "guardian",
-                "validacion": "validacion",
                 "agregar_producto": "agregar_producto",
             },
         )
@@ -88,7 +84,6 @@ class AgentWorkflow:
         workflow.add_edge("logistica", END)
         workflow.add_edge("confirmacion_datos", END)
         workflow.add_edge("pago", END)
-        workflow.add_edge("validacion", END)
         workflow.add_edge("agregar_producto", END)
 
         workflow.add_conditional_edges(

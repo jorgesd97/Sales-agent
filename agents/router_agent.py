@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 VALID_STAGES = {
     "bienvenida", "objeciones", "promociones", "logistica",
-    "confirmacion_datos", "pago", "validacion", "agregar_producto",
+    "confirmacion_datos", "pago", "agregar_producto",
 }
 
 
@@ -59,7 +59,7 @@ class RouterAgent:
         prompt = f"""You are a sales conversation router. Given the conversation history and the customer's latest message, determine which sales stage the conversation is currently in.
 
 RULES (evaluate in this order):
-- If the current message contains the marker [COMPROBANTE_PAGO] → "validacion"
+- If the customer says they will send / are about to send the payment receipt (e.g. "ahí te paso el comprobante", "ya te envío el voucher", "en un momento pago"), route to "pago". The pago node will acknowledge and wait for the receipt. Do NOT confirm any payment from text alone.
 - If the Product type is Físico and the shipping cost has NOT been calculated yet in the conversation history (no shipping amount mentioned by the seller), you MUST route to "logistica" before "confirmacion_datos" — even if the customer already gave their location or data → "logistica"
 - If payment info was already shown AND all required data is collected → "pago"
 - If products are chosen AND delivery data is still missing → "confirmacion_datos"
@@ -88,7 +88,7 @@ Product type: {naturaleza_producto}
 Respond ONLY with valid JSON, no additional text, no markdown, no ```json fences:
 {{"etapa": "..."}}
 
-Valid values: bienvenida, objeciones, promociones, logistica, confirmacion_datos, pago, validacion, agregar_producto
+Valid values: bienvenida, objeciones, promociones, logistica, confirmacion_datos, pago, agregar_producto
 """
 
         try:
