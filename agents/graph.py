@@ -2,6 +2,7 @@ from langgraph.graph import StateGraph, END
 
 from agents.state import EstadoVenta
 from agents.nodes.bienvenida import nodo_bienvenida
+from agents.nodes.consultivo import nodo_consultivo
 
 
 class SalesGraph:
@@ -11,8 +12,10 @@ class SalesGraph:
     def _build(self):
         g = StateGraph(EstadoVenta)
         g.add_node("bienvenida", nodo_bienvenida)
+        g.add_node("consultivo", nodo_consultivo)
         g.set_entry_point("bienvenida")
-        g.add_edge("bienvenida", END)
+        g.add_edge("bienvenida", "consultivo")
+        g.add_edge("consultivo", END)
         return g.compile()
 
     async def run(
@@ -33,6 +36,8 @@ class SalesGraph:
             "naturaleza_producto": naturaleza_producto,
             "simbolo_moneda": simbolo_moneda,
             "table_name": table_name,
+            "saludo_prefijo": "",
+            "context": "",
             "respuesta": "",
             "etapa": "",
         }

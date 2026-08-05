@@ -11,6 +11,10 @@ class EstadoVenta(TypedDict, total=False):
     simbolo_moneda: str
     table_name: str
 
+    # --- Intermedios ---
+    saludo_prefijo: str        # lo produce bienvenida; lo consume consultivo
+    context: str               # chunks recuperados de la KB
+
     # --- Salida ---
     respuesta: str
 
