@@ -40,6 +40,10 @@ class SalesGraph:
             "context": "",
             "respuesta": "",
             "etapa": "",
+            "is_fallback": False,
         }
         final = await self.compiled.ainvoke(estado_inicial)
-        return {"answer": final["respuesta"]}
+        return {
+            "answer": final["respuesta"],
+            "is_fallback": final.get("is_fallback", False),
+        }

@@ -69,12 +69,18 @@ async def chat(request: ChatRequest, api_key: str = Depends(verify_api_key)):
             table_name=request.table_name,
         )
 
-        memory.save_interaction(
-            session_id=request.session_id,
-            question=request.question,
-            answer=result["answer"],
-            table_name=request.memory_table,
-        )
+        if result.get("is_fallback"):
+            logger.warning(
+                f"[chat] respuesta fallback para session {request.session_id}, "
+                f"no se guardará en memoria"
+            )
+        else:
+            memory.save_interaction(
+                session_id=request.session_id,
+                question=request.question,
+                answer=result["answer"],
+                table_name=request.memory_table,
+            )
 
         return ChatResponse(answer=result["answer"])
 

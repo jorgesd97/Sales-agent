@@ -1,3 +1,5 @@
+import asyncio
+
 from google import genai
 from google.genai import types
 import logging
@@ -6,6 +8,10 @@ from config.settings import settings
 from retriever.supabase_retriever import SupabaseRetriever
 
 logger = logging.getLogger(__name__)
+
+FALLBACK_MSG = "Disculpe, tuve un problema al procesar su consulta. ¿Podría repetírmela?"
+MAX_RETRIES = 3
+RETRY_DELAY_SECONDS = 1.5
 
 
 class LLMGenerador:
@@ -50,7 +56,7 @@ class LLMGenerador:
         prompt_nodo: str = "",
         chat_history: str = "",
         table_name: str = "kb_demo",
-    ) -> str:
+    ) -> tuple[str, bool]:
         promo_docs = await self.retriever.search(
             query="Promociones",
             table_name=table_name,
@@ -94,15 +100,37 @@ Desbes concretar una venta completa y seguir el flujo de venta.
 
 **Tu respuesta:**
 """
-        try:
-            response = self.client.models.generate_content(
-                model=settings.GEMINI_FLASH_MODEL_HIGH,
-                contents=prompt,
-                config=self.config,
-            )
-            answer = (response.text or "").strip()
-            logger.info(f"[llm_generador] respuesta generada para: '{question[:60]}'")
-            return answer
-        except Exception as e:
-            logger.error(f"[llm_generador] error: {e}")
-            return "Disculpe, tuve un problema al procesar su consulta. ¿Podría repetírmela?"
+        last_error = None
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                response = self.client.models.generate_content(
+                    model=settings.GEMINI_FLASH_MODEL_HIGH,
+                    contents=prompt,
+                    config=self.config,
+                )
+                answer = (response.text or "").strip()
+                if not answer:
+                    logger.warning(f"[llm_generador] respuesta vacía en intento {attempt}")
+                    raise ValueError("empty_response")
+
+                logger.info(f"[llm_generador] respuesta generada para: '{question[:60]}' (intento {attempt})")
+                return answer, False
+
+            except Exception as e:
+                last_error = e
+                error_str = str(e)
+                is_rate_limit = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str
+
+                if is_rate_limit and attempt < MAX_RETRIES:
+                    logger.warning(
+                        f"[llm_generador] 429 rate limit en intento {attempt}/{MAX_RETRIES}, "
+                        f"reintentando en {RETRY_DELAY_SECONDS}s..."
+                    )
+                    await asyncio.sleep(RETRY_DELAY_SECONDS)
+                    continue
+
+                logger.error(f"[llm_generador] error en intento {attempt}: {e}")
+                break
+
+        logger.error(f"[llm_generador] retries agotados o error fatal, último error: {last_error}")
+        return FALLBACK_MSG, True

@@ -20,3 +20,4 @@ class EstadoVenta(TypedDict, total=False):
 
     # --- Control de flujo (crecerá con cada nodo nuevo) ---
     etapa: str
+    is_fallback: bool  # True si la respuesta es el mensaje de fallback (no debe guardarse en memoria)

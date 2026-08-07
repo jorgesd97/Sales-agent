@@ -26,7 +26,7 @@ async def nodo_consultivo(state: EstadoVenta) -> dict:
     logger.info(f"[consultivo] {len(documents)} chunks recuperados ({len(context)} chars)")
 
     prompts = state.get("prompts", {}) or {}
-    respuesta_llm = await _llm.generar(
+    respuesta_llm, is_fallback = await _llm.generar(
         question=state.get("question", ""),
         current_time=state.get("current_time", ""),
         context=context,
@@ -36,11 +36,23 @@ async def nodo_consultivo(state: EstadoVenta) -> dict:
         table_name=state.get("table_name", "kb_demo"),
     )
 
-    # Fusiona el saludo (si bienvenida lo dejó) con la respuesta del LLM.
+    if is_fallback:
+        return {
+            "respuesta": respuesta_llm,
+            "context": context,
+            "etapa": "consultivo",
+            "is_fallback": True,
+        }
+
     saludo = (state.get("saludo_prefijo", "") or "").strip()
     if saludo:
         respuesta = f"{saludo}\n---\n{respuesta_llm}"
     else:
         respuesta = respuesta_llm
 
-    return {"respuesta": respuesta, "context": context, "etapa": "consultivo"}
+    return {
+        "respuesta": respuesta,
+        "context": context,
+        "etapa": "consultivo",
+        "is_fallback": False,
+    }
