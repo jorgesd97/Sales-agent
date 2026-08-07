@@ -18,7 +18,7 @@ _retriever = SupabaseRetriever()
 
 async def nodo_consultivo(state: EstadoVenta) -> dict:
     documents = await _retriever.search(
-        query=QUERY_CONSULTIVA,
+        query=state.get("question", ""),
         table_name=state.get("table_name", "kb_demo"),
         match_count=5,
     )
