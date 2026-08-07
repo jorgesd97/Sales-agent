@@ -33,6 +33,7 @@ async def nodo_consultivo(state: EstadoVenta) -> dict:
         prompt_base=prompts.get("base", ""),
         prompt_nodo=prompts.get("consultivo", ""),
         chat_history=state.get("chat_history", ""),
+        table_name=state.get("table_name", "kb_demo"),
     )
 
     # Fusiona el saludo (si bienvenida lo dejó) con la respuesta del LLM.

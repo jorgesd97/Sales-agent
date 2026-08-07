@@ -3,6 +3,7 @@ from google.genai import types
 import logging
 
 from config.settings import settings
+from retriever.supabase_retriever import SupabaseRetriever
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ class LLMGenerador:
             location=settings.GOOGLE_CLOUD_LOCATION,
             credentials=credentials,
         )
+        self.retriever = SupabaseRetriever()
         self.config = types.GenerateContentConfig(
             temperature=0.4,
             max_output_tokens=2000,
@@ -47,7 +49,15 @@ class LLMGenerador:
         prompt_base: str = "",
         prompt_nodo: str = "",
         chat_history: str = "",
+        table_name: str = "kb_demo",
     ) -> str:
+        promo_docs = await self.retriever.search(
+            query="Promociones",
+            table_name=table_name,
+            match_count=1,
+        )
+        promociones_vigentes = self.retriever.format_context(promo_docs)
+
         prompt = f"""{prompt_base}
 
 {prompt_nodo}
@@ -64,9 +74,9 @@ nunca narres el cálculo.
 {chat_history}
 
 **Objetivo:**
-Desbes completa el flujo de venta y tocar cada paso
+Desbes concretar una venta completa y seguir el l flujo de venta para esto.
 ### Flujo de venta
-1) Cuando el cliente ya tenga su orden completa debes buscar promociones de producto en el contexto y aplicarlas de ser el caso
+1) Estas son las promociones vigentes {promociones_vigentes} aplicalas cuando el cliente se note interesado o cuando notes que quiere abandonar la conversación úsalas para completar tu objetivo.
 2) Posterior a esto entregar un resumen ordenado de su orden y el costo logistico
 3) Debes poder tener estos 3 datos para proceder con el pago: a) Pedido b) dirección exacta con referencia y c) Fecha de entrega deseada
 4) Cuando completes el paso 3 debes brindar los medios de pago al cliente usando el query "medios de pago"
