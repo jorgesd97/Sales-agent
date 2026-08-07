@@ -28,7 +28,7 @@ class LLMGenerador:
             credentials=credentials,
         )
         self.config = types.GenerateContentConfig(
-            temperature=0.3,
+            temperature=0.4,
             max_output_tokens=2000,
             thinking_config=types.ThinkingConfig(thinking_budget=0),
             safety_settings=[
@@ -63,6 +63,14 @@ nunca narres el cálculo.
 **Historial de conversación:**
 {chat_history}
 
+**Objetivo:**
+Desbes completa el flujo de venta y tocar cada paso
+### Flujo de venta
+1) Cuando el cliente ya tenga su orden completa debes buscar promociones de producto en el contexto y aplicarlas de ser el caso
+2) Posterior a esto entregar un resumen ordenado de su orden y el costo logistico
+3) Debes poder tener estos 3 datos para proceder con el pago: a) Pedido b) dirección exacta con referencia y c) Fecha de entrega deseada
+4) Cuando completes el paso 3 debes brindar los medios de pago al cliente usando el query "medios de pago"
+
 **Contexto (base de conocimiento):**
 {context}
 
@@ -71,11 +79,7 @@ nunca narres el cálculo.
 - Responde usando ÚNICAMENTE la información del contexto. No inventes datos que no estén ahí.
 - Si el contexto no tiene la información, dilo con honestidad y ofrece consultar.
 - Sé claro y conciso. Respuestas cortas, tono cercano, trato de "usted", máximo 1 emoji.
-- FORMATO PARA WHATSAPP: escribe como se chatea en el celular, en mensajes cortos. Si tu respuesta abarca dos ideas distintas (por ejemplo, responder sobre un producto Y sobre otro tema), sepáralas en globos usando una línea con exactamente tres guiones "---" entre ellas. Cada globo debe ser breve (1 a 3 líneas). Usa "---" solo entre ideas separadas; no lo pongas al inicio, ni al final, ni dentro de una misma idea. Si la respuesta es una sola idea corta, no uses "---".
-- CIERRE / CONFIRMACIÓN: agrega al final una línea "---" y luego, en un globo aparte, exactamente esta pregunta: "¿Me confirma su pedido? Reviso si aplica alguna promo 😊" — PERO solo si se cumplen A LA VEZ estas dos condiciones:
-    (1) el cliente ya identificó un producto específico que quiere (no basta preguntar "¿qué venden?");
-    (2) el cliente da una señal de avanzar:dice que lo quiere/lo necesita, pregunta cómo pagar por ese producto, o pide cerrar la compra.
-  Si el cliente solo pregunta precios sueltos, pide una recomendación o consulta, NO agregues la pregunta. En caso de duda, NO la agregues. Nunca agregues esta pregunta más de una vez en la misma respuesta.
+- FORMATO PARA WHATSAPP: escribe como se chatea en el celular, en mensajes cortos. Si tu respuesta es mu largo (por ejemplo, responder sobre un producto Y sobre otro tema), sepáralas en globos usando una línea con exactamente tres guiones "---" entre ellas. Cada globo debe ser breve (1 a 3 líneas). Usa "---" solo entre ideas separadas; no lo pongas al inicio, ni al final, ni dentro de una misma idea. Si la respuesta es una sola idea corta, no uses "---".
 
 **Mensaje actual del cliente:** {question}
 

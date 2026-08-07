@@ -20,7 +20,7 @@ async def nodo_consultivo(state: EstadoVenta) -> dict:
     documents = await _retriever.search(
         query=state.get("question", ""),
         table_name=state.get("table_name", "kb_demo"),
-        match_count=5,
+        match_count=3,
     )
     context = _retriever.format_context(documents)
     logger.info(f"[consultivo] {len(documents)} chunks recuperados ({len(context)} chars)")
