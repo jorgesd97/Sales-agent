@@ -6,6 +6,7 @@ import logging
 
 from config.settings import settings
 from retriever.supabase_retriever import SupabaseRetriever
+from retriever.promotions_service import PromotionsService
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,7 @@ class LLMGenerador:
             credentials=credentials,
         )
         self.retriever = SupabaseRetriever()
+        self.promotions_service = PromotionsService()
         self.config = types.GenerateContentConfig(
             temperature=0.4,
             max_output_tokens=2000,
@@ -57,12 +59,8 @@ class LLMGenerador:
         chat_history: str = "",
         table_name: str = "kb_demo",
     ) -> tuple[str, bool]:
-        promo_docs = await self.retriever.search(
-            query="Promociones",
-            table_name=table_name,
-            match_count=1,
-        )
-        promociones_vigentes = self.retriever.format_context(promo_docs)
+        promos = await self.promotions_service.get_active_promotions()
+        promociones_vigentes = self.promotions_service.format_promotions(promos)
 
         prompt = f"""{prompt_base}
 
@@ -82,7 +80,18 @@ nunca narres el cálculo.
 **Objetivo:**
 Desbes concretar una venta completa y seguir el flujo de venta.
 ### Flujo de venta
-1) Estas son las promociones vigentes {promociones_vigentes} aplicalas siempre en la conversación o aplica un descuento para forzar la compra (10%  dscto en algun producto que desees.). Ejem: "Si reservas ahora se aplica un dscto. en ..."
+1) === PROMOCIONES DISPONIBLES ===
+{promociones_vigentes}
+
+INSTRUCCIONES DE USO DE PROMOCIONES:
+- Antes de ofrecer una promoción, verifica que se cumpla EXACTAMENTE su "condición de aplicación". No la fuerces si no aplica.
+- No inventes promociones que no estén en la lista de arriba. Solo podés ofrecer las listadas.
+- Elige la promoción MÁS RELEVANTE al momento actual de la conversación (guiate por el campo "Úsala cuando" de cada una).
+- Si dos promociones aplican simultáneamente, prioriza la que aparece primero en la lista (están ordenadas por prioridad descendente).
+- Usa la "Frase sugerida" como base para tu mensaje: podés adaptar el tono al cliente, pero NO cambies los números, porcentajes o condiciones.
+- Si la frase sugerida tiene un placeholder tipo {{X}}, reemplazalo por el cálculo correcto (ejemplo: si el pedido es S/95 y la promo es envío gratis > S/120, reemplaza {{X}} por 25).
+- Dispará una promoción principalmente cuando: (a) el cliente está indeciso, (b) está cerca de un umbral que activa un beneficio, (c) objeta precio, o (d) para cerrar una venta que ya está madura.
+- Si en el momento actual ninguna promoción aplica claramente, NO ofrezcas ninguna. No fuerces descuentos sin razón — eso reduce margen sin cerrar más ventas.
 2) Debes siempre entregar un resumen ordenado de su orden y el costo de envio con un total de la compra.
 3) Debes poder tener estos 3 datos para proceder con el pago: a) Pedido b) dirección exacta con referencia y c) Fecha de entrega deseada
 4) Cuando completes el paso 3) debes brindar los medios de pago al cliente usando el query "medios de pago"
