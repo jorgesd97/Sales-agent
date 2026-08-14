@@ -1,120 +1,165 @@
+# sales_classifier.py  (o el nombre que tengas)
+
 from google import genai
 from google.genai import types
 import json
 import logging
 import re
-
+from pydantic import BaseModel, Field, field_validator, ValidationError
+from typing import Optional, List
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
+# ═══════════════════════════════════════════════════════════════
+# 1. MODELOS PYDANTIC (ponlos aquí arriba, antes de la clase)
+# ═══════════════════════════════════════════════════════════════
+
+class DatosVenta(BaseModel):
+    pedido: Optional[str] = Field(
+        None,
+        description="Formato: 'nro x descripcion'. Ej: '2 unidades de Perlita de 5 Litros para Plantas'. Múltiples items con \\n"
+    )
+    monto: Optional[str] = Field(None, description="Ej: S/ 70.80")
+    fecha_entrega: Optional[str] = Field(
+        None,
+        description="Formato obligatorio: 'día. Mes año' en español. Ej: '11 ago. 2026'"
+    )
+    hora_entrega: Optional[str] = Field(
+        None,
+        description="Formato: 'HH:MM - HH:MM' si es rango, o 'HH:MM'. Ej: '19:00 - 23:00'"
+    )
+    nombre: Optional[str] = None
+    numero_telefono: Optional[str] = Field(None, description="SIEMPRE null. El backend lo llena.")
+    direccion: Optional[str] = None
+    fecha_voucher: Optional[str] = Field(
+        None,
+        description="YYYY-MM-DD estricto. Ej: '2026-08-02'"
+    )
+
+    @field_validator('fecha_entrega')
+    @classmethod
+    def validate_fecha_entrega(cls, v):
+        if v is None:
+            return v
+        if not re.match(r'^\d{1,2}\s+[a-z]{3,}\.\s*\d{4}$', v, re.IGNORECASE):
+            raise ValueError("fecha_entrega debe ser 'día. Mes año'. Ej: '11 ago. 2026'")
+        return v
+
+    @field_validator('hora_entrega')
+    @classmethod
+    def validate_hora_entrega(cls, v):
+        if v is None:
+            return v
+        if not re.match(r'^\d{2}:\d{2}(\s*-\s*\d{2}:\d{2})?$', v):
+            raise ValueError("hora_entrega debe ser 'HH:MM - HH:MM' o 'HH:MM'")
+        return v
+
+    @field_validator('pedido')
+    @classmethod
+    def validate_pedido(cls, v):
+        if v is None:
+            return v
+        lines = [line.strip() for line in str(v).split('\n') if line.strip()]
+        for line in lines:
+            if not re.match(r'^\d+\s+x\s+.+', line):
+                raise ValueError(f"Pedido mal formado: {line}")
+        return '\n'.join(lines)
+
+
+class SalesClassificationOutput(BaseModel):
+    venta_cerrada: bool
+    datos_completos: bool
+    datos_faltantes: Optional[List[str]] = None
+    datos_venta: DatosVenta
+    error: Optional[str] = None
+
+
+# ═══════════════════════════════════════════════════════════════
+# 2. TU CLASE SalesClassifier (abajo, usando los modelos)
+# ═══════════════════════════════════════════════════════════════
 
 class SalesClassifier:
     def __init__(self):
-        import os
-        from google.oauth2 import service_account
-
-        creds_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-        scopes = ["https://www.googleapis.com/auth/cloud-platform"]
-        credentials = service_account.Credentials.from_service_account_file(
-            creds_path,
-            scopes=scopes,
-        )
-        self.client = genai.Client(
-            vertexai=True,
-            project=settings.GOOGLE_CLOUD_PROJECT,
-            location=settings.GOOGLE_CLOUD_LOCATION,
-            credentials=credentials,
-        )
-        self.config = types.GenerateContentConfig(
-            temperature=0,
-            max_output_tokens=500,
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
-            safety_settings=[
-                types.SafetySetting(
-                    category="HARM_CATEGORY_HARASSMENT",
-                    threshold="BLOCK_NONE",
-                ),
-                types.SafetySetting(
-                    category="HARM_CATEGORY_HATE_SPEECH",
-                    threshold="BLOCK_NONE",
-                ),
-                types.SafetySetting(
-                    category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                    threshold="BLOCK_NONE",
-                ),
-                types.SafetySetting(
-                    category="HARM_CATEGORY_DANGEROUS_CONTENT",
-                    threshold="BLOCK_NONE",
-                ),
-            ],
-        )
+        # ... tu código actual de init ...
+        pass
 
     async def classify(self, chat_history: str, sales_criteria: str) -> dict:
-        prompt = f"""You are a sales classification agent. Analyze the following conversation to determine if a sale was completed.
+        prompt = self._build_prompt(chat_history, sales_criteria)
 
-**Your tasks:**
-1. Confirm whether there is a validated payment in the conversation (look for the marker [COMPROBANTE_PAGO]).
-2. Check each criterion from the sales criteria against the conversation. Be STRICT: mark datos_completos as false if ANY criterion is missing.
-3. Extract the sale data from the conversation. If a data point is NOT found in the conversation, set it as null and list it in datos_faltantes. Do NOT invent data.
+        for attempt in range(2):
+            try:
+                response = self.client.models.generate_content(
+                    model=settings.GEMINI_FLASH_MODEL_LOW,
+                    contents=prompt,
+                    config=self.config,
+                )
 
-Note: do NOT flag "numero_telefono" as missing — it is provided by the system, not extracted from the conversation. Leave it as null; the backend will fill it.
-For "fecha_voucher": extract ONLY the date (no time) and return it in strict format YYYY-MM-DD. Convert Spanish month names/abbreviations to numbers (e.g. "02 Ago. 2026" -> "2026-08-02", "15 de julio de 2026" -> "2026-07-15"). If the date cannot be determined, use null.
+                if not response.text:
+                    return self._safe_fallback("empty_response")
+
+                raw = response.text.strip()
+                raw = re.sub(r"^```json\s*", "", raw, flags=re.IGNORECASE)
+                raw = re.sub(r"\s*```$", "", raw)
+
+                parsed = json.loads(raw)
+
+                # AQUÍ USAS PYDANTIC PARA VALIDAR
+                validated = SalesClassificationOutput(**parsed)
+
+                result_dict = validated.model_dump()
+                result_dict["datos_venta"]["numero_telefono"] = None  # Forzar null
+
+                logger.info(f"OK: venta_cerrada={result_dict['venta_cerrada']}")
+                return result_dict
+
+            except (json.JSONDecodeError, ValidationError) as e:
+                logger.error(f"Intento {attempt + 1} falló: {e}")
+                if attempt == 0:
+                    prompt += f"\n\nERROR PREVIO: {str(e)}\nCorrige el JSON siguiendo el formato exacto."
+                else:
+                    return self._safe_fallback(f"validation_error: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error inesperado: {e}")
+                return self._safe_fallback(str(e))
+
+    def _build_prompt(self, chat_history: str, sales_criteria: str) -> str:
+        schema = SalesClassificationOutput.model_json_schema()
+        return f"""You are a sales classification agent.
+
+**OUTPUT FORMAT (STRICT JSON):**
+{json.dumps(schema, indent=2)}
+
+**CRITICAL RULES:**
+- fecha_entrega: "día. Mes año"  →  Ej: "11 ago. 2026"
+- hora_entrega: "HH:MM - HH:MM" o "HH:MM"  →  Ej: "19:00 - 23:00"
+- pedido: cada línea "nro x descripcion"  →  Ej: "2 unidades de Perlita de 5 Litros para Plantas"
+- fecha_voucher: YYYY-MM-DD  →  Ej: "2026-08-02"
+- numero_telefono: null (siempre)
+- Si falta un dato, usa null. NUNCA inventes datos.
 
 **Sales Criteria:**
 {sales_criteria}
 
-**Complete Conversation:**
+**Conversation:**
 {chat_history}
 
-**Respond ONLY with valid JSON, no additional text, no markdown, no ```json fences. Only the JSON object:**
-{{
-  "venta_cerrada": true/false,
-  "datos_completos": true/false,
-  "datos_faltantes": ["..."] or null,
-  "datos_venta": {{
-    "pedido": "..." or null,
-    "monto": "..." or null,
-    "fecha_entrega": "..." or null,
-    "nombre": "..." or null,
-    "numero_telefono": "..." or null,
-    "direccion": "..." or null,
-    "fecha_voucher": "YYYY-MM-DD" or null
-  }}
-}}
-"""
-
-        try:
-            response = self.client.models.generate_content(
-                model=settings.GEMINI_FLASH_MODEL_LOW,
-                contents=prompt,
-                config=self.config,
-            )
-
-            if not response.text:
-                logger.warning("Sales classifier returned empty response")
-                return self._safe_fallback("empty_response")
-
-            raw = response.text.strip()
-            raw = re.sub(r"^```json\s*", "", raw)
-            raw = re.sub(r"\s*```$", "", raw)
-
-            result = json.loads(raw)
-            logger.info(f"Sales classification: venta_cerrada={result.get('venta_cerrada')}, datos_completos={result.get('datos_completos')}")
-            return result
-
-        except json.JSONDecodeError as e:
-            logger.error(f"Sales classifier JSON parse error: {e}")
-            return self._safe_fallback("parse_error")
-        except Exception as e:
-            logger.error(f"Sales classifier error: {e}")
-            return self._safe_fallback(str(e))
+**Respond ONLY with raw JSON. No markdown, no ``` fences.**"""
 
     def _safe_fallback(self, error: str) -> dict:
         return {
             "venta_cerrada": False,
             "datos_completos": False,
             "datos_faltantes": None,
-            "datos_venta": {},
+            "datos_venta": {
+                "pedido": None,
+                "monto": None,
+                "fecha_entrega": None,
+                "hora_entrega": None,
+                "nombre": None,
+                "numero_telefono": None,
+                "direccion": None,
+                "fecha_voucher": None,
+            },
             "error": error,
         }
