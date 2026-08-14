@@ -1,4 +1,4 @@
-# sales_classifier.py  (o el nombre que tengas)
+# sales_classifier.py
 
 from google import genai
 from google.genai import types
@@ -11,30 +11,31 @@ from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
+
 # ═══════════════════════════════════════════════════════════════
-# 1. MODELOS PYDANTIC (ponlos aquí arriba, antes de la clase)
+# MODELOS PYDANTIC
 # ═══════════════════════════════════════════════════════════════
 
 class DatosVenta(BaseModel):
     pedido: Optional[str] = Field(
         None,
-        description="Formato: 'nro x descripcion'. Ej: '2 unidades de Perlita de 5 Litros para Plantas'. Múltiples items con \\n"
+        description="Formato obligatorio: 'nro x descripcion'. Ej: '2 unidades de Perlita de 5 Litros para Plantas'. "
+                    "Si hay multiples items, separar con saltos de linea \\n. Ej: '2 x Perlita 5L\\n1 x Sustrato'"
     )
-    monto: Optional[str] = Field(None, description="Ej: S/ 70.80")
+    monto: Optional[str] = Field(None, description="Monto con moneda. Ej: S/ 70.80")
     fecha_entrega: Optional[str] = Field(
         None,
-        description="Formato obligatorio: 'día. Mes año' en español. Ej: '11 ago. 2026'"
+        description="Formato obligatorio: 'dia. Mes año' en español, abreviado. Ej: '11 ago. 2026', '1 ene. 2025'"
     )
     hora_entrega: Optional[str] = Field(
         None,
-        description="Formato: 'HH:MM - HH:MM' si es rango, o 'HH:MM'. Ej: '19:00 - 23:00'"
+        description="Formato: 'HH:MM - HH:MM' si es rango, o 'HH:MM' si es hora unica. Ej: '19:00 - 23:00', '14:30'"
     )
     nombre: Optional[str] = None
-    numero_telefono: Optional[str] = Field(None, description="SIEMPRE null. El backend lo llena.")
     direccion: Optional[str] = None
     fecha_voucher: Optional[str] = Field(
         None,
-        description="YYYY-MM-DD estricto. Ej: '2026-08-02'"
+        description="YYYY-MM-DD estricto. Solo fecha, sin hora. Ej: '2026-08-11'"
     )
 
     @field_validator('fecha_entrega')
@@ -43,7 +44,7 @@ class DatosVenta(BaseModel):
         if v is None:
             return v
         if not re.match(r'^\d{1,2}\s+[a-z]{3,}\.\s*\d{4}$', v, re.IGNORECASE):
-            raise ValueError("fecha_entrega debe ser 'día. Mes año'. Ej: '11 ago. 2026'")
+            raise ValueError("fecha_entrega debe ser formato 'dia. Mes año'. Ej: '11 ago. 2026'")
         return v
 
     @field_validator('hora_entrega')
@@ -62,8 +63,8 @@ class DatosVenta(BaseModel):
             return v
         lines = [line.strip() for line in str(v).split('\n') if line.strip()]
         for line in lines:
-            if not re.match(r'^\d+\s+x\s+.+', line):
-                raise ValueError(f"Pedido mal formado: {line}")
+            if not re.match(r'^\d+\s+.+', line):
+                raise ValueError(f"Cada linea de pedido debe empezar con cantidad. Fallo: {line}")
         return '\n'.join(lines)
 
 
@@ -76,13 +77,49 @@ class SalesClassificationOutput(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 2. TU CLASE SalesClassifier (abajo, usando los modelos)
+# CLASIFICADOR
 # ═══════════════════════════════════════════════════════════════
 
 class SalesClassifier:
     def __init__(self):
-        # ... tu código actual de init ...
-        pass
+        import os
+        from google.oauth2 import service_account
+
+        creds_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+        scopes = ["https://www.googleapis.com/auth/cloud-platform"]
+        credentials = service_account.Credentials.from_service_account_file(
+            creds_path,
+            scopes=scopes,
+        )
+        self.client = genai.Client(
+            vertexai=True,
+            project=settings.GOOGLE_CLOUD_PROJECT,
+            location=settings.GOOGLE_CLOUD_LOCATION,
+            credentials=credentials,
+        )
+        self.config = types.GenerateContentConfig(
+            temperature=0,
+            max_output_tokens=800,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            safety_settings=[
+                types.SafetySetting(
+                    category="HARM_CATEGORY_HARASSMENT",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_HATE_SPEECH",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_DANGEROUS_CONTENT",
+                    threshold="BLOCK_NONE",
+                ),
+            ],
+        )
 
     async def classify(self, chat_history: str, sales_criteria: str) -> dict:
         prompt = self._build_prompt(chat_history, sales_criteria)
@@ -96,55 +133,76 @@ class SalesClassifier:
                 )
 
                 if not response.text:
+                    logger.warning("Sales classifier returned empty response")
                     return self._safe_fallback("empty_response")
 
                 raw = response.text.strip()
                 raw = re.sub(r"^```json\s*", "", raw, flags=re.IGNORECASE)
                 raw = re.sub(r"\s*```$", "", raw)
 
-                parsed = json.loads(raw)
+                result = json.loads(raw)
+                validated = SalesClassificationOutput(**result)
+                output = validated.model_dump()
 
-                # AQUÍ USAS PYDANTIC PARA VALIDAR
-                validated = SalesClassificationOutput(**parsed)
-
-                result_dict = validated.model_dump()
-                result_dict["datos_venta"]["numero_telefono"] = None  # Forzar null
-
-                logger.info(f"OK: venta_cerrada={result_dict['venta_cerrada']}")
-                return result_dict
+                logger.info(
+                    f"Sales classification: venta_cerrada={output.get('venta_cerrada')}, "
+                    f"datos_completos={output.get('datos_completos')}"
+                )
+                return output
 
             except (json.JSONDecodeError, ValidationError) as e:
-                logger.error(f"Intento {attempt + 1} falló: {e}")
+                logger.error(f"Sales classifier validation error (intento {attempt + 1}): {e}")
                 if attempt == 0:
-                    prompt += f"\n\nERROR PREVIO: {str(e)}\nCorrige el JSON siguiendo el formato exacto."
+                    prompt += f"\n\n[ERROR DE FORMATO PREVIO]: {str(e)}\n"
+                    prompt += "Corrige el JSON siguiendo EXACTAMENTE el formato y el ejemplo mostrados arriba. "
+                    prompt += "Responde SOLO con el JSON corregido, sin texto adicional."
                 else:
-                    return self._safe_fallback(f"validation_error: {str(e)}")
+                    return self._safe_fallback(f"parse/validation error: {str(e)}")
             except Exception as e:
-                logger.error(f"Error inesperado: {e}")
+                logger.error(f"Sales classifier error: {e}")
                 return self._safe_fallback(str(e))
 
     def _build_prompt(self, chat_history: str, sales_criteria: str) -> str:
-        schema = SalesClassificationOutput.model_json_schema()
-        return f"""You are a sales classification agent.
+        return f"""You are a sales classification agent. Analyze the following conversation to determine if a sale was completed.
 
-**OUTPUT FORMAT (STRICT JSON):**
-{json.dumps(schema, indent=2)}
+**Your tasks:**
+1. Confirm whether there is a validated payment in the conversation (look for the marker [COMPROBANTE_PAGO]).
+2. Check each criterion from the sales criteria against the conversation. Be STRICT: mark datos_completos as false if ANY criterion is missing.
+3. Extract the sale data from the conversation. If a data point is NOT found in the conversation, set it as null and list it in datos_faltantes. Do NOT invent data.
 
-**CRITICAL RULES:**
-- fecha_entrega: "día. Mes año"  →  Ej: "11 ago. 2026"
-- hora_entrega: "HH:MM - HH:MM" o "HH:MM"  →  Ej: "19:00 - 23:00"
-- pedido: cada línea "nro x descripcion"  →  Ej: "2 unidades de Perlita de 5 Litros para Plantas"
-- fecha_voucher: YYYY-MM-DD  →  Ej: "2026-08-02"
-- numero_telefono: null (siempre)
-- Si falta un dato, usa null. NUNCA inventes datos.
+**CRITICAL OUTPUT FORMAT RULES (follow these EXACTLY):**
+
+- `fecha_entrega`: MUST be "dia. Mes año" in Spanish, abbreviated month. Examples: "11 ago. 2026", "15 jul. 2026", "1 ene. 2025"
+- `hora_entrega`: MUST be "HH:MM - HH:MM" for time ranges, or "HH:MM" for single time. Examples: "19:00 - 23:00", "14:30"
+- `pedido`: MUST start with the quantity. Examples: "2 unidades de Perlita de 5 Litros para Plantas". If multiple items, use \\n between lines.
+- `fecha_voucher`: extract ONLY the date (no time) and return in strict format YYYY-MM-DD. Convert Spanish month names/abbreviations to numbers (e.g. "02 Ago. 2026" -> "2026-08-02", "15 de julio de 2026" -> "2026-07-15"). If the date cannot be determined, use null.
+- `monto`: include the currency symbol if present. Example: "S/ 70.80"
+- If any data is missing, use null. NEVER invent data.
+
+**EXAMPLE OUTPUT:**
+{{
+  "venta_cerrada": true,
+  "datos_completos": true,
+  "datos_faltantes": null,
+  "datos_venta": {{
+    "pedido": "2 unidades de Perlita de 5 Litros para Plantas",
+    "monto": "S/ 70.80",
+    "fecha_entrega": "11 ago. 2026",
+    "hora_entrega": "19:00 - 23:00",
+    "nombre": "Eduardo Soto",
+    "direccion": "miraflores av mariscal caceres 123 lote 8",
+    "fecha_voucher": "2026-08-11"
+  }}
+}}
 
 **Sales Criteria:**
 {sales_criteria}
 
-**Conversation:**
+**Complete Conversation:**
 {chat_history}
 
-**Respond ONLY with raw JSON. No markdown, no ``` fences.**"""
+**Respond ONLY with valid JSON, no additional text, no markdown, no ```json fences. Only the JSON object:**
+"""
 
     def _safe_fallback(self, error: str) -> dict:
         return {
@@ -157,7 +215,6 @@ class SalesClassifier:
                 "fecha_entrega": None,
                 "hora_entrega": None,
                 "nombre": None,
-                "numero_telefono": None,
                 "direccion": None,
                 "fecha_voucher": None,
             },
