@@ -119,8 +119,23 @@ INSTRUCCIONES DE USO DE PROMOCIONES:
                 )
                 answer = (response.text or "").strip()
                 if not answer:
-                    logger.warning(f"[llm_generador] respuesta vacía en intento {attempt}")
-                    raise ValueError("empty_response")
+                    finish_reason = None
+                    safety_ratings = None
+                    usage = None
+                    try:
+                        finish_reason = response.candidates[0].finish_reason
+                        safety_ratings = response.candidates[0].safety_ratings
+                    except Exception:
+                        pass
+                    try:
+                        usage = response.usage_metadata
+                    except Exception:
+                        pass
+                    logger.warning(
+                        f"[llm_generador] respuesta vacía. finish_reason={finish_reason}, "
+                        f"safety_ratings={safety_ratings}, usage_metadata={usage}"
+                    )
+                    raise ValueError("empty_response"))
 
                 logger.info(f"[llm_generador] respuesta generada para: '{question[:60]}' (intento {attempt})")
                 return answer, False

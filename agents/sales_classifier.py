@@ -174,7 +174,7 @@ class SalesClassifier:
 
 - `fecha_entrega`: MUST be "dia. Mes año" in Spanish, abbreviated month. Examples: "11 ago. 2026", "15 jul. 2026", "1 ene. 2025"
 - `hora_entrega`: MUST be "HH:MM - HH:MM" for time ranges, or "HH:MM" for single time. Examples: "19:00 - 23:00", "14:30"
-- `pedido`: MUST start with the quantity. Examples: "2 unidades de Perlita de 5 Litros para Plantas". If multiple items, use \\n between lines.
+- `pedido`: MUST start with the quantity. Examples: "2 x Perlita de 5 Litros para Plantas". If multiple items, use \\n between lines.
 - `fecha_voucher`: extract ONLY the date (no time) and return in strict format YYYY-MM-DD. Convert Spanish month names/abbreviations to numbers (e.g. "02 Ago. 2026" -> "2026-08-02", "15 de julio de 2026" -> "2026-07-15"). If the date cannot be determined, use null.
 - `monto`: include the currency symbol if present. Example: "S/ 70.80"
 - If any data is missing, use null. NEVER invent data.
@@ -185,8 +185,8 @@ class SalesClassifier:
   "datos_completos": true,
   "datos_faltantes": null,
   "datos_venta": {{
-    "pedido": "2 unidades de Perlita de 5 Litros para Plantas",
-    "monto": "S/ 70.80",
+    "pedido": "2 x Perlita de 5 Litros para Plantas",
+    "monto": "70.80",
     "fecha_entrega": "11 ago. 2026",
     "hora_entrega": "19:00 - 23:00",
     "nombre": "Eduardo Soto",
