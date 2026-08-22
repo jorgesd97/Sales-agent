@@ -22,10 +22,15 @@ class DatosVenta(BaseModel):
         description="Formato obligatorio: 'nro x descripcion'. Ej: '2 unidades de Perlita de 5 Litros para Plantas'. "
                     "Si hay multiples items, separar con saltos de linea \\n. Ej: '2 x Perlita 5L\\n1 x Sustrato'"
     )
-    monto: Optional[str] = Field(None, description="Monto con moneda. Ej: S/ 70.80")
+    monto: Optional[float] = Field(
+        None,
+        description="Monto TOTAL de la venta como numero puro, SIN simbolo de moneda, SIN comas. "
+                    "Ej: 70.80 (no 'S/ 70.80', no '70,80')"
+    )
     fecha_entrega: Optional[str] = Field(
         None,
-        description="Formato obligatorio: 'dia. Mes año' en español, abreviado. Ej: '11 ago. 2026', '1 ene. 2025'"
+        description="Formato ISO estricto YYYY-MM-DD. Solo fecha, sin hora, sin timezone. "
+                    "Convierte cualquier fecha en español a este formato. Ej: '2026-08-11'"
     )
     hora_entrega: Optional[str] = Field(
         None,
@@ -38,13 +43,31 @@ class DatosVenta(BaseModel):
         description="YYYY-MM-DD estricto. Solo fecha, sin hora. Ej: '2026-08-11'"
     )
 
-    @field_validator('fecha_entrega')
+    @field_validator('monto', mode='before')
     @classmethod
-    def validate_fecha_entrega(cls, v):
+    def validate_monto(cls, v):
         if v is None:
             return v
-        if not re.match(r'^\d{1,2}\s+[a-z]{3,}\.\s*\d{4}$', v, re.IGNORECASE):
-            raise ValueError("fecha_entrega debe ser formato 'dia. Mes año'. Ej: '11 ago. 2026'")
+        # Defensa extra: si el LLM igual manda string con simbolo/comas, lo limpiamos.
+        if isinstance(v, str):
+            cleaned = re.sub(r'[^\d.]', '', v.replace(',', '.'))
+            if not cleaned:
+                raise ValueError(f"monto no contiene digitos validos: '{v}'")
+            try:
+                return float(cleaned)
+            except ValueError:
+                raise ValueError(f"monto no se pudo convertir a numero: '{v}'")
+        return v
+
+    @field_validator('fecha_entrega', 'fecha_voucher')
+    @classmethod
+    def validate_fecha_iso(cls, v):
+        if v is None:
+            return v
+        if not re.match(r'^\d{4}-\d{2}-\d{2}$', v):
+            raise ValueError(
+                f"Fecha debe ser formato ISO 'YYYY-MM-DD'. Recibido: '{v}'"
+            )
         return v
 
     @field_validator('hora_entrega')
@@ -171,12 +194,11 @@ class SalesClassifier:
 3. Extract the sale data from the conversation. If a data point is NOT found in the conversation, set it as null and list it in datos_faltantes. Do NOT invent data.
 
 **CRITICAL OUTPUT FORMAT RULES (follow these EXACTLY):**
-
-- `fecha_entrega`: MUST be "dia. Mes año" in Spanish, abbreviated month. Examples: "11 ago. 2026", "15 jul. 2026", "1 ene. 2025"
+- `fecha_entrega`: MUST be ISO format "YYYY-MM-DD", NO time, NO timezone. Convert any Spanish date mentioned in the conversation to this format. Examples: "11 ago. 2026" -> "2026-08-11", "mañana" (resolve using current date reference) -> "2026-08-12"
 - `hora_entrega`: MUST be "HH:MM - HH:MM" for time ranges, or "HH:MM" for single time. Examples: "19:00 - 23:00", "14:30"
 - `pedido`: MUST start with the quantity. Examples: "2 x Perlita de 5 Litros para Plantas". If multiple items, use \\n between lines.
 - `fecha_voucher`: extract ONLY the date (no time) and return in strict format YYYY-MM-DD. Convert Spanish month names/abbreviations to numbers (e.g. "02 Ago. 2026" -> "2026-08-02", "15 de julio de 2026" -> "2026-07-15"). If the date cannot be determined, use null.
-- `monto`: include the currency symbol if present. Example: "S/ 70.80"
+- `monto`: MUST be a plain NUMBER (JSON number type, not string), WITHOUT currency symbol, WITHOUT thousand separators. Examples: 70.80 (NOT "S/ 70.80", NOT "70,80", NOT "S/70.80")
 - If any data is missing, use null. NEVER invent data.
 
 **EXAMPLE OUTPUT:**
@@ -186,8 +208,8 @@ class SalesClassifier:
   "datos_faltantes": null,
   "datos_venta": {{
     "pedido": "2 x Perlita de 5 Litros para Plantas",
-    "monto": "70.80",
-    "fecha_entrega": "11 ago. 2026",
+    "monto": 70.80,
+    "fecha_entrega": "2026-08-11",
     "hora_entrega": "19:00 - 23:00",
     "nombre": "Eduardo Soto",
     "direccion": "miraflores av mariscal caceres 123 lote 8",

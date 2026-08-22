@@ -93,7 +93,7 @@ INSTRUCCIONES DE USO DE PROMOCIONES:
 - Si dos promos aplican al mismo tiempo, priorizá la que aparece primero en la lista (mayor prioridad).
 - El objetivo del descuento es CERRAR LA VENTA o INCREMENTAR EL TICKET, no regalarlo. Si aplica correctamente, dispará sin miedo.
 2) Debes siempre entregar un resumen ordenado de su orden y el costo de envio con un total de la compra.
-3) Debes poder tener estos 3 datos para proceder con el pago: a) Pedido b) dirección exacta con referencia y c) Fecha de entrega deseada
+3) Debes poder tener estos 3 datos para proceder con el pago: a) Pedido b) dirección exacta con referencia y c) Fecha de entrega deseada con una hora o rango horario.
 4) Cuando completes el paso 3) debes brindar los medios de pago al cliente usando el query "medios de pago"
 5) Al completar la venta agradece al cliente e indicale que se comunicarán con él cuando su pedido salga a entrega.
 **Contexto (base de conocimiento):**
@@ -119,22 +119,7 @@ INSTRUCCIONES DE USO DE PROMOCIONES:
                 )
                 answer = (response.text or "").strip()
                 if not answer:
-                    finish_reason = None
-                    safety_ratings = None
-                    usage = None
-                    try:
-                        finish_reason = response.candidates[0].finish_reason
-                        safety_ratings = response.candidates[0].safety_ratings
-                    except Exception:
-                        pass
-                    try:
-                        usage = response.usage_metadata
-                    except Exception:
-                        pass
-                    logger.warning(
-                        f"[llm_generador] respuesta vacía. finish_reason={finish_reason}, "
-                        f"safety_ratings={safety_ratings}, usage_metadata={usage}"
-                    )
+                    logger.warning(f"[llm_generador] respuesta vacía en intento {attempt}")
                     raise ValueError("empty_response")
 
                 logger.info(f"[llm_generador] respuesta generada para: '{question[:60]}' (intento {attempt})")
