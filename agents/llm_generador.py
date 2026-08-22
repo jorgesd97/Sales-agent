@@ -135,7 +135,7 @@ INSTRUCCIONES DE USO DE PROMOCIONES:
                         f"[llm_generador] respuesta vacía. finish_reason={finish_reason}, "
                         f"safety_ratings={safety_ratings}, usage_metadata={usage}"
                     )
-                    raise ValueError("empty_response"))
+                    raise ValueError("empty_response")
 
                 logger.info(f"[llm_generador] respuesta generada para: '{question[:60]}' (intento {attempt})")
                 return answer, False
