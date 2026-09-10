@@ -1,6 +1,8 @@
 import logging
 
-from agents.state import EstadoVenta
+from agent_framework import Executor, WorkflowContext, handler
+
+from agents.messages import PeticionCliente, PeticionConSaludo
 
 logger = logging.getLogger(__name__)
 
@@ -12,22 +14,34 @@ def _historial_vacio(chat_history: str) -> bool:
     return not (chat_history or "").strip()
 
 
-def nodo_bienvenida(state: EstadoVenta) -> dict:
-    """Nodo 1 — Saludo. Decisión determinista, sin LLM.
+class BienvenidaExecutor(Executor):
+    """Executor 1 — Saludo. Decisión determinista, sin LLM.
 
-    Ya NO produce la respuesta final: produce solo un PREFIJO de saludo que el
-    nodo consultivo antepone a su respuesta en el mismo turno.
+    No produce la respuesta final: produce solo un PREFIJO de saludo que el
+    executor consultivo antepone a su respuesta en el mismo turno.
 
     Sin historial -> cliente nuevo -> prefijo con saludo de plantilla.
     Con historial -> prefijo vacío (no se vuelve a saludar).
     """
-    prompts = state.get("prompts", {}) or {}
 
-    if _historial_vacio(state.get("chat_history", "")):
-        saludo = prompts.get("saludo_plantilla", SALUDO_PLANTILLA_DEFAULT)
-        logger.info("[bienvenida] cliente nuevo -> prefijo de saludo")
-    else:
-        saludo = ""
-        logger.info("[bienvenida] con historial -> sin saludo")
+    def __init__(self):
+        super().__init__(id="bienvenida")
 
-    return {"saludo_prefijo": saludo, "etapa": "consultivo"}
+    @handler
+    async def run(
+        self,
+        peticion: PeticionCliente,
+        ctx: WorkflowContext[PeticionConSaludo],
+    ) -> None:
+        prompts = peticion.prompts or {}
+
+        if _historial_vacio(peticion.chat_history):
+            saludo = prompts.get("saludo_plantilla", SALUDO_PLANTILLA_DEFAULT)
+            logger.info("[bienvenida] cliente nuevo -> prefijo de saludo")
+        else:
+            saludo = ""
+            logger.info("[bienvenida] con historial -> sin saludo")
+
+        await ctx.send_message(
+            PeticionConSaludo(peticion=peticion, saludo_prefijo=saludo)
+        )

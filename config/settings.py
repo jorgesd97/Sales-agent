@@ -2,38 +2,30 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    # Vertex AI
-    GOOGLE_CLOUD_PROJECT: str
-    GOOGLE_CLOUD_LOCATION: str = "us-central1"
-    GOOGLE_APPLICATION_CREDENTIALS_JSON: str  # el JSON completo como string
+    # --- Azure OpenAI (reemplaza Vertex AI) ---
+    AZURE_OPENAI_ENDPOINT: str
+    AZURE_OPENAI_API_KEY: str
+    AZURE_OPENAI_DEPLOYMENT: str = "gpt5mini-dodo"
+    AZURE_OPENAI_EMBEDDING_DEPLOYMENT: str = "embeddings-dodo"
 
-    GEMINI_FLASH_MODEL_LOW: str = "gemini-2.5-flash"
-    GEMINI_FLASH_MODEL_HIGH: str = "gemini-2.5-flash"
+    # --- Azure AI Search (reemplaza la Edge Function `hybrid-search`) ---
+    AZURE_SEARCH_ENDPOINT: str
+    AZURE_SEARCH_ADMIN_KEY: str
+    AZURE_SEARCH_INDEX_NAME: str = "dodo-knowledge-base"
 
-    # Supabase Edge Function
+    # --- Supabase: memoria + promociones (aún sin migrar) ---
     SUPABASE_URL: str
     SUPABASE_ANON_KEY: str
-    SUPABASE_EDGE_FUNCTION_URL: str = ""
-
-    # Postgres Memory
     POSTGRES_CONNECTION_STRING: str
 
-    # Defaults
-    DEFAULT_TABLE_NAME: str = "kb_demo"
+    # --- Defaults ---
     DEFAULT_MATCH_COUNT: int = 3
 
-    # API
+    # --- API ---
     AGENT_API_KEY: str
 
     class Config:
         env_file = ".env"
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        if not self.SUPABASE_EDGE_FUNCTION_URL:
-            self.SUPABASE_EDGE_FUNCTION_URL = (
-                f"{self.SUPABASE_URL}/functions/v1/hybrid-search"
-            )
 
 
 settings = Settings()

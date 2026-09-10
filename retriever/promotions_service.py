@@ -11,7 +11,7 @@ class PromotionsService:
     Servicio que lee las promociones activas desde la tabla `promociones`
     de Supabase vía la API REST de PostgREST.
 
-    A diferencia del SupabaseRetriever (que hace búsqueda semántica sobre la KB),
+    A diferencia del AzureSearchRetriever (que hace búsqueda híbrida sobre la KB),
     este servicio hace un query estructurado directo a una tabla. Se usa para
     inyectar TODAS las promociones activas en el prompt del agente en cada turno,
     ordenadas por prioridad descendente.

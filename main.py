@@ -1,13 +1,10 @@
-from config.gcp_auth import setup_google_credentials
-setup_google_credentials()
-from datetime import datetime
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from agents.graph import SalesGraph
+from agents.workflow import SalesWorkflow
 from agents.sales_classifier import SalesClassifier
 from memory.postgres_memory import PostgresMemory
 from config.settings import settings
@@ -16,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Sales Agent API", docs_url=None, redoc_url=None, openapi_url=None)
-graph = SalesGraph()
+workflow = SalesWorkflow()
 classifier = SalesClassifier()
 memory = PostgresMemory()
 
@@ -36,6 +33,9 @@ class ChatRequest(BaseModel):
     prompts: dict = {}
     naturaleza_producto: str = "FISICO"
     simbolo_moneda: str = "S/"
+    # `table_name` ya no aplica: el índice de la KB se define en settings
+    # (AZURE_SEARCH_INDEX_NAME). Se sigue aceptando para no romper el contrato
+    # con n8n, pero se ignora.
     table_name: str = "kb_demo"
     memory_table: str = "demo_chat_db"
 
@@ -59,14 +59,13 @@ async def chat(request: ChatRequest, api_key: str = Depends(verify_api_key)):
         dia_semana = dias[now_lima.weekday()]
         mes = meses[now_lima.month - 1]
         current_time_str = f"{dia_semana} {now_lima.day} de {mes} de {now_lima.year}, {now_lima.strftime('%H:%M')} horas (formato 24h)"
-        result = await graph.run(
+        result = await workflow.run(
             question=request.question,
             current_time=current_time_str,
             prompts=request.prompts,
             naturaleza_producto=request.naturaleza_producto,
             simbolo_moneda=request.simbolo_moneda,
             chat_history=chat_history,
-            table_name=request.table_name,
         )
 
         if result.get("is_fallback"):

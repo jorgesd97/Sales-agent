@@ -1,12 +1,13 @@
 # sales_classifier.py
 
-from google import genai
-from google.genai import types
-import json
+import asyncio
 import logging
 import re
-from pydantic import BaseModel, Field, field_validator, ValidationError
-from typing import Optional, List
+from typing import List, Optional
+
+from openai import OpenAI
+from pydantic import BaseModel, Field, ValidationError, field_validator
+
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -14,6 +15,11 @@ logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════
 # MODELOS PYDANTIC
+#
+# Con Structured Outputs el SDK garantiza que la respuesta es JSON válido y
+# conforme al schema, así que estos validadores ya no son defensa contra
+# formato roto: validan REGLAS DE NEGOCIO (fecha ISO real, pedido que empieza
+# con cantidad, monto numérico limpio).
 # ═══════════════════════════════════════════════════════════════
 
 class DatosVenta(BaseModel):
@@ -105,125 +111,63 @@ class SalesClassificationOutput(BaseModel):
 
 class SalesClassifier:
     def __init__(self):
-        import os
-        from google.oauth2 import service_account
-
-        creds_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-        scopes = ["https://www.googleapis.com/auth/cloud-platform"]
-        credentials = service_account.Credentials.from_service_account_file(
-            creds_path,
-            scopes=scopes,
+        endpoint = settings.AZURE_OPENAI_ENDPOINT.rstrip("/")
+        self.client = OpenAI(
+            base_url=f"{endpoint}/openai/v1/",
+            api_key=settings.AZURE_OPENAI_API_KEY,
         )
-        self.client = genai.Client(
-            vertexai=True,
-            project=settings.GOOGLE_CLOUD_PROJECT,
-            location=settings.GOOGLE_CLOUD_LOCATION,
-            credentials=credentials,
-        )
-        self.config = types.GenerateContentConfig(
-            temperature=0,
-            max_output_tokens=800,
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
-            safety_settings=[
-                types.SafetySetting(
-                    category="HARM_CATEGORY_HARASSMENT",
-                    threshold="BLOCK_NONE",
-                ),
-                types.SafetySetting(
-                    category="HARM_CATEGORY_HATE_SPEECH",
-                    threshold="BLOCK_NONE",
-                ),
-                types.SafetySetting(
-                    category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                    threshold="BLOCK_NONE",
-                ),
-                types.SafetySetting(
-                    category="HARM_CATEGORY_DANGEROUS_CONTENT",
-                    threshold="BLOCK_NONE",
-                ),
-            ],
-        )
+        self.deployment = settings.AZURE_OPENAI_DEPLOYMENT
 
     async def classify(self, chat_history: str, sales_criteria: str) -> dict:
-        prompt = self._build_prompt(chat_history, sales_criteria)
-
-        for attempt in range(2):
-            try:
-                response = self.client.models.generate_content(
-                    model=settings.GEMINI_FLASH_MODEL_LOW,
-                    contents=prompt,
-                    config=self.config,
+        instructions = self._build_instructions(sales_criteria)
+        try:
+            # El cliente de OpenAI es síncrono: se va a un hilo para no bloquear
+            # el event loop de FastAPI.
+            # NOTA: los modelos gpt-5.x rechazan `temperature` con HTTP 400.
+            # Con Structured Outputs no hace falta.
+            response = await asyncio.to_thread(
+                lambda: self.client.responses.parse(
+                    model=self.deployment,
+                    instructions=instructions,
+                    input=f"**Conversación completa:**\n{chat_history}",
+                    text_format=SalesClassificationOutput,
                 )
+            )
 
-                if not response.text:
-                    logger.warning("Sales classifier returned empty response")
-                    return self._safe_fallback("empty_response")
+            parsed = response.output_parsed
+            if parsed is None:
+                logger.warning("Sales classifier returned empty response")
+                return self._safe_fallback("empty_response")
 
-                raw = response.text.strip()
-                raw = re.sub(r"^```json\s*", "", raw, flags=re.IGNORECASE)
-                raw = re.sub(r"\s*```$", "", raw)
+            output = parsed.model_dump()
+            logger.info(
+                f"Sales classification: venta_cerrada={output.get('venta_cerrada')}, "
+                f"datos_completos={output.get('datos_completos')}"
+            )
+            return output
 
-                result = json.loads(raw)
-                validated = SalesClassificationOutput(**result)
-                output = validated.model_dump()
+        except ValidationError as e:
+            # El schema lo garantiza el SDK; esto es una regla de negocio rota
+            # (fecha no ISO, pedido sin cantidad, etc.).
+            logger.error(f"Sales classifier business-rule validation error: {e}")
+            return self._safe_fallback(f"validation error: {str(e)}")
+        except Exception as e:
+            logger.error(f"Sales classifier error: {e}")
+            return self._safe_fallback(str(e))
 
-                logger.info(
-                    f"Sales classification: venta_cerrada={output.get('venta_cerrada')}, "
-                    f"datos_completos={output.get('datos_completos')}"
-                )
-                return output
-
-            except (json.JSONDecodeError, ValidationError) as e:
-                logger.error(f"Sales classifier validation error (intento {attempt + 1}): {e}")
-                if attempt == 0:
-                    prompt += f"\n\n[ERROR DE FORMATO PREVIO]: {str(e)}\n"
-                    prompt += "Corrige el JSON siguiendo EXACTAMENTE el formato y el ejemplo mostrados arriba. "
-                    prompt += "Responde SOLO con el JSON corregido, sin texto adicional."
-                else:
-                    return self._safe_fallback(f"parse/validation error: {str(e)}")
-            except Exception as e:
-                logger.error(f"Sales classifier error: {e}")
-                return self._safe_fallback(str(e))
-
-    def _build_prompt(self, chat_history: str, sales_criteria: str) -> str:
-        return f"""You are a sales classification agent. Analyze the following conversation to determine if a sale was completed.
+    def _build_instructions(self, sales_criteria: str) -> str:
+        return f"""You are a sales classification agent. Analyze the conversation the user provides to determine if a sale was completed.
 
 **Your tasks:**
 1. Confirm whether there is a validated payment in the conversation (look for the marker [COMPROBANTE_PAGO]).
 2. Check each criterion from the sales criteria against the conversation. Be STRICT: mark datos_completos as false if ANY criterion is missing.
 3. Extract the sale data from the conversation. If a data point is NOT found in the conversation, set it as null and list it in datos_faltantes. Do NOT invent data.
 
-**CRITICAL OUTPUT FORMAT RULES (follow these EXACTLY):**
-- `fecha_entrega`: MUST be ISO format "YYYY-MM-DD", NO time, NO timezone. Convert any Spanish date mentioned in the conversation to this format. Examples: "11 ago. 2026" -> "2026-08-11", "mañana" (resolve using current date reference) -> "2026-08-12"
-- `hora_entrega`: MUST be "HH:MM - HH:MM" for time ranges, or "HH:MM" for single time. Examples: "19:00 - 23:00", "14:30"
-- `pedido`: MUST start with the quantity. Examples: "2 x Perlita de 5 Litros para Plantas". If multiple items, use \\n between lines.
-- `fecha_voucher`: extract ONLY the date (no time) and return in strict format YYYY-MM-DD. Convert Spanish month names/abbreviations to numbers (e.g. "02 Ago. 2026" -> "2026-08-02", "15 de julio de 2026" -> "2026-07-15"). If the date cannot be determined, use null.
-- `monto`: MUST be a plain NUMBER (JSON number type, not string), WITHOUT currency symbol, WITHOUT thousand separators. Examples: 70.80 (NOT "S/ 70.80", NOT "70,80", NOT "S/70.80")
-- If any data is missing, use null. NEVER invent data.
-
-**EXAMPLE OUTPUT:**
-{{
-  "venta_cerrada": true,
-  "datos_completos": true,
-  "datos_faltantes": null,
-  "datos_venta": {{
-    "pedido": "2 x Perlita de 5 Litros para Plantas",
-    "monto": 70.80,
-    "fecha_entrega": "2026-08-11",
-    "hora_entrega": "19:00 - 23:00",
-    "nombre": "Eduardo Soto",
-    "direccion": "miraflores av mariscal caceres 123 lote 8",
-    "fecha_voucher": "2026-08-11"
-  }}
-}}
+Respect the description of every field of the output schema: it defines the exact
+format expected for dates, times, amounts and the order line.
 
 **Sales Criteria:**
 {sales_criteria}
-
-**Complete Conversation:**
-{chat_history}
-
-**Respond ONLY with valid JSON, no additional text, no markdown, no ```json fences. Only the JSON object:**
 """
 
     def _safe_fallback(self, error: str) -> dict:
